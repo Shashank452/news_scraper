@@ -6,7 +6,7 @@ Provides Pydantic models for validation, serialization, and API schemas.
 from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class NewsItemBase(BaseModel):
@@ -66,8 +66,7 @@ class NewsItemResponse(NewsItemBase):
         description="Timestamp when item was ingested into our system",
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 def categorize_announcement(title: str, description: Optional[str] = None) -> str:

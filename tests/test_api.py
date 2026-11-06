@@ -7,13 +7,18 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from api.news_api import app
 from config import settings
 from database import Base, NewsItemRecord, get_db
 
-# Setup test SQLite database
-test_engine = create_engine("sqlite:///:memory:", echo=False)
+# Setup test SQLite database using StaticPool to share in-memory state across connections
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = sessionmaker(bind=test_engine)
 Base.metadata.create_all(bind=test_engine)
 

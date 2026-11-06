@@ -1,10 +1,12 @@
 """
 BSE (Bombay Stock Exchange) Announcements Scraper.
-Fetches real-time corporate announcements from BSE API endpoints.
+Fetches real-time corporate announcements from BSE's official feeds.
 """
 
 from datetime import datetime
+import re
 from typing import List, Optional
+import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 import requests
 
@@ -19,8 +21,10 @@ IST_TZ = ZoneInfo("Asia/Kolkata")
 class BSEScraper(BaseScraper):
     """
     Scrapes real-time corporate announcements from BSE India.
+    Uses the real-time XML/RSS disclosure feed with JSON API fallback.
     """
 
+    RSS_FEED_URL = "https://www.bseindia.com/data/xml/announcements.aspx"
     API_URL = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
     ATTACHMENT_BASE_URL = "https://www.bseindia.com/xml-data/corpfiling/AttachLive"
 
@@ -28,23 +32,28 @@ class BSEScraper(BaseScraper):
         super().__init__(name="bse", rate_limit_interval=rate_limit_interval)
         self.session.headers.update(
             {
-                "Origin": "https://www.bseindia.com",
-                "Referer": "https://www.bseindia.com/",
-                "Accept": "application/json, text/plain, */*",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
             }
         )
 
     def _parse_bse_datetime(self, dt_str: Optional[str]) -> datetime:
-        """Parses BSE date strings like '2024-05-10T15:30:00' or '10/05/2024 15:30:00'."""
+        """Parses BSE date strings like '06-Nov-2026 19:23:28' or '2024-05-10T15:30:00'."""
         if not dt_str:
             return datetime.now(IST_TZ)
 
         formats = [
+            "%d-%b-%Y %H:%M:%S",
+            "%d-%b-%Y %H:%M",
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S",
             "%d/%m/%Y %H:%M:%S",
             "%d-%m-%Y %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S.%f",
         ]
         for fmt in formats:
             try:
@@ -55,64 +64,59 @@ class BSEScraper(BaseScraper):
 
         return datetime.now(IST_TZ)
 
-    def fetch_latest(self, page_no: int = 1) -> List[NewsItemCreate]:
+    def fetch_latest(self, max_items: int = 100) -> List[NewsItemCreate]:
         """
-        Fetches latest corporate announcements from BSE.
+        Fetches latest corporate announcements from BSE RSS feed.
         """
         self.rate_limiter.wait()
         items: List[NewsItemCreate] = []
 
-        params = {
-            "pageno": str(page_no),
-            "strCat": "-1",
-            "strPrevDate": "",
-            "strScrip": "",
-            "strSearch": "P",
-            "strToDate": "",
-            "strType": "C",
-        }
-
         try:
-            logger.info("Fetching latest corporate announcements from BSE...")
-            resp = self.session.get(self.API_URL, params=params, timeout=self.timeout)
+            logger.info("Fetching corporate announcements feed from BSE...")
+            resp = self.session.get(self.RSS_FEED_URL, timeout=self.timeout)
             resp.raise_for_status()
-            data = resp.json()
 
-            table_data = data.get("Table", [])
-            if not table_data and isinstance(data, list):
-                table_data = data
+            root = ET.fromstring(resp.content)
+            channel = root.find("channel")
+            if channel is None:
+                logger.warning("BSE RSS response missing channel element.")
+                return []
 
-            for entry in table_data:
-                news_id = str(entry.get("NEWS_ID") or entry.get("SCRIP_CD", "") + "_" + str(entry.get("NEWS_DT", "")))
-                if not news_id:
+            xml_items = channel.findall("item")[:max_items]
+
+            for entry in xml_items:
+                raw_title = clean_text(entry.findtext("title"))
+                link = entry.findtext("link")
+                raw_desc = clean_text(entry.findtext("description"))
+                pub_date_str = entry.findtext("pubDate")
+
+                if not raw_title:
                     continue
 
-                scrip_cd = str(entry.get("SCRIP_CD") or "").strip()
-                company_name = entry.get("SLONGNAME") or entry.get("NEWSSUB", "")
-                headline = entry.get("HEADLINE") or entry.get("NEWSSUB") or "Corporate Announcement"
-                headline = clean_text(headline)
-                more_desc = clean_text(entry.get("MORE") or entry.get("CATEGORYNAME") or "")
+                # Extract scrip code if present in format: "Company Name Ltd (500325)"
+                scrip_match = re.search(r"\((\d{4,6})\)", raw_title)
+                scrip_code = scrip_match.group(1) if scrip_match else None
+                company_name = re.sub(r"\(\d{4,6}\)", "", raw_title).strip()
 
-                attachment = entry.get("ATTACHMENTNAME")
-                source_url = None
-                if attachment:
-                    source_url = f"{self.ATTACHMENT_BASE_URL}/{attachment.strip()}"
-                else:
-                    source_url = f"https://www.bseindia.com/corporates/ann.html?scrip={scrip_cd}"
+                published_at = self._parse_bse_datetime(pub_date_str)
+                category = categorize_announcement(raw_desc or raw_title)
 
-                published_at = self._parse_bse_datetime(entry.get("NEWS_DT") or entry.get("DT_TM"))
-                category = categorize_announcement(headline, more_desc)
+                # Extract unique ID from attachment URL or generate unique key
+                source_id = None
+                if link and "/AttachLive/" in link:
+                    source_id = link.split("/AttachLive/")[-1].replace(".pdf", "")
+                if not source_id:
+                    source_id = f"{scrip_code or 'bse'}_{published_at.strftime('%Y%m%d%H%M%S')}"
 
-                # Prefer Scrip Code or company ticker
-                ticker = scrip_cd if scrip_cd else normalize_ticker(company_name)
+                ticker = scrip_code if scrip_code else normalize_ticker(company_name)
 
                 item = NewsItemCreate(
                     ticker=ticker,
-                    title=headline,
-                    description=more_desc if more_desc else None,
+                    title=f"{company_name}: {raw_desc[:120]}" if raw_desc else raw_title,
+                    description=raw_desc if raw_desc else None,
                     source="bse",
-                    source_url=source_url,
-                    source_id=f"bse_{news_id}",
+                    source_url=link,
+                    source_id=f"bse_{source_id}",
                     category=category,
                     published_at=published_at,
                 )

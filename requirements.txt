@@ -10,6 +10,7 @@ psycopg2-binary>=2.9.9
 
 # Async / HTTP
 aiohttp>=3.9.3
+curl-cffi>=0.7.0
 
 # Scheduler & Timezones
 apscheduler>=3.10.4

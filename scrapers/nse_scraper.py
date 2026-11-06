@@ -1,13 +1,20 @@
 """
 NSE (National Stock Exchange) Corporate Announcements Scraper.
-Handles dynamic session initialization, cookies, and corporate announcements JSON API.
+Uses browser impersonation (curl_cffi) to pass Akamai/WAF defenses,
+warm up session cookies, and retrieve live corporate announcements JSON.
 """
 
 from datetime import datetime
 import time
 from typing import List, Optional
 from zoneinfo import ZoneInfo
-import requests
+
+try:
+    from curl_cffi import requests as curl_requests
+    HAS_CURL_CFFI = True
+except ImportError:
+    import requests as curl_requests
+    HAS_CURL_CFFI = False
 
 from config import settings
 from news_model import NewsItemCreate, categorize_announcement
@@ -20,7 +27,7 @@ IST_TZ = ZoneInfo("Asia/Kolkata")
 class NSEScraper(BaseScraper):
     """
     Scrapes real-time corporate announcements from NSE India.
-    Implements session warmup and automatic cookie renewal.
+    Implements session warmup and automatic cookie renewal with Chrome impersonation.
     """
 
     HOME_URL = "https://www.nseindia.com"
@@ -29,19 +36,16 @@ class NSEScraper(BaseScraper):
 
     def __init__(self, rate_limit_interval: float = 2.0):
         super().__init__(name="nse", rate_limit_interval=rate_limit_interval)
-        self.session.headers.update(
-            {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-            }
-        )
+        self.session = curl_requests.Session()
         self._session_initialized = False
         self._session_created_at = 0.0
+
+    def _get_request_kwargs(self) -> dict:
+        """Helper to attach browser impersonation kwargs if curl_cffi is available."""
+        kwargs = {"timeout": self.timeout}
+        if HAS_CURL_CFFI:
+            kwargs["impersonate"] = "chrome124"
+        return kwargs
 
     def _ensure_session(self) -> bool:
         """
@@ -55,11 +59,11 @@ class NSEScraper(BaseScraper):
         try:
             logger.info("Initializing NSE session and cookies...")
             self.rate_limiter.wait()
-            resp = self.session.get(self.HOME_URL, timeout=self.timeout)
+            resp = self.session.get(self.HOME_URL, **self._get_request_kwargs())
             if resp.status_code == 200:
                 self._session_initialized = True
                 self._session_created_at = now
-                logger.info("NSE session initialized successfully.")
+                logger.info(f"NSE session initialized successfully (cookies: {len(self.session.cookies)}).")
                 return True
             else:
                 logger.warning(f"Failed to initialize NSE session, HTTP status: {resp.status_code}")
@@ -69,7 +73,7 @@ class NSEScraper(BaseScraper):
             return False
 
     def _parse_nse_datetime(self, dt_str: Optional[str]) -> datetime:
-        """Parses NSE date format like '06-Nov-2024 16:30:15' or '06-11-2024 16:30:15'."""
+        """Parses NSE date format like '06-Nov-2026 19:26:06' or '06-11-2026 16:30:15'."""
         if not dt_str:
             return datetime.now(IST_TZ)
 
@@ -77,8 +81,8 @@ class NSEScraper(BaseScraper):
             "%d-%b-%Y %H:%M:%S",
             "%d-%b-%Y %H:%M",
             "%d-%m-%Y %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
         ]
         for fmt in formats:
             try:
@@ -106,8 +110,11 @@ class NSEScraper(BaseScraper):
         }
 
         try:
-            logger.info("Fetching latest corporate announcements from NSE...")
-            resp = self.session.get(self.API_URL, headers=headers, timeout=self.timeout)
+            logger.info("Fetching corporate announcements from NSE...")
+            kwargs = self._get_request_kwargs()
+            kwargs["headers"] = headers
+
+            resp = self.session.get(self.API_URL, **kwargs)
 
             # If session expired or unauthorized, reset session once and retry
             if resp.status_code in (401, 403):
@@ -116,7 +123,7 @@ class NSEScraper(BaseScraper):
                 if not self._ensure_session():
                     self._last_error = f"Failed to renew NSE session (HTTP {resp.status_code})"
                     return []
-                resp = self.session.get(self.API_URL, headers=headers, timeout=self.timeout)
+                resp = self.session.get(self.API_URL, **kwargs)
 
             resp.raise_for_status()
             raw_data = resp.json()
@@ -126,26 +133,29 @@ class NSEScraper(BaseScraper):
 
             for entry in announcements:
                 symbol = normalize_ticker(entry.get("symbol") or entry.get("SYMBOL"))
-                desc = clean_text(entry.get("desc") or entry.get("subject") or entry.get("an_dt"))
+                company_name = entry.get("sm_name") or ""
+                desc = clean_text(entry.get("desc") or entry.get("subject") or "")
+                att_text = clean_text(entry.get("attchmntText") or "")
                 seq_id = str(entry.get("seq_id") or entry.get("an_id") or f"{symbol}_{entry.get('an_dt')}")
-                
-                if not desc:
+
+                headline = f"{company_name}: {desc}" if company_name and desc else (desc or att_text)
+                if not headline:
                     continue
 
-                attachment = entry.get("attmnt") or entry.get("attachment")
+                attachment = entry.get("attchmntFile") or entry.get("attmnt") or entry.get("attachment")
                 source_url = None
                 if attachment:
-                    source_url = f"{self.ARCHIVE_BASE_URL}/{attachment.strip()}"
+                    source_url = attachment if attachment.startswith("http") else f"{self.ARCHIVE_BASE_URL}/{attachment.strip()}"
                 else:
                     source_url = f"https://www.nseindia.com/get-quotes/equity?symbol={symbol}"
 
-                published_at = self._parse_nse_datetime(entry.get("an_dt") or entry.get("dt"))
-                category = categorize_announcement(desc)
+                published_at = self._parse_nse_datetime(entry.get("an_dt") or entry.get("sort_date"))
+                category = categorize_announcement(f"{desc} {att_text}")
 
                 item = NewsItemCreate(
                     ticker=symbol,
-                    title=desc,
-                    description=clean_text(entry.get("sm_name") or ""),
+                    title=headline,
+                    description=att_text if att_text else desc,
                     source="nse",
                     source_url=source_url,
                     source_id=f"nse_{seq_id}",

@@ -3,6 +3,7 @@ REST API for News Scraper Service.
 Provides endpoints for querying, filtering, exporting, and triggering news scraping.
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Header, Query, Response, status
@@ -17,26 +18,20 @@ from news_model import NewsItemResponse
 from aggregators.news_aggregator import NewsAggregator
 from utils import logger
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure database schema is created on application startup."""
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="Indian Stock Market News Scraper API",
     description="Real-time corporate announcement ingestion and query service for BSE & NSE.",
     version="1.0.0",
+    lifespan=lifespan,
 )
-
-# Enable CORS for internal dashboards or frontend consumers
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-def on_startup():
-    """Ensure database schema is created on startup."""
-    init_db()
 
 
 def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> bool:
@@ -159,7 +154,7 @@ def get_news_by_source(
     tags=["Export"],
 )
 def export_news(
-    format: str = Query("json", regex="^(json|csv)$", description="Export format: 'json' or 'csv'"),
+    format: str = Query("json", pattern="^(json|csv)$", description="Export format: 'json' or 'csv'"),
     ticker: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
