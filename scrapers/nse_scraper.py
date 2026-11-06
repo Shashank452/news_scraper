@@ -32,6 +32,8 @@ class NSEScraper(BaseScraper):
 
     HOME_URL = "https://www.nseindia.com"
     API_URL = "https://www.nseindia.com/api/corporate-announcements?index=equities"
+    CIRCULARS_URL = "https://www.nseindia.com/api/circulars"
+    ALL_INDICES_URL = "https://www.nseindia.com/api/allIndices"
     ARCHIVE_BASE_URL = "https://nsearchives.nseindia.com/corporate"
 
     def __init__(self, rate_limit_interval: float = 2.0):
@@ -166,9 +168,85 @@ class NSEScraper(BaseScraper):
 
             self._last_error = None
             logger.info(f"NSE Scraper retrieved {len(items)} announcement items.")
+
+            # Also fetch latest official exchange circulars
+            circulars = self.fetch_circulars(max_items=20)
+            items.extend(circulars)
+
             return items
 
         except Exception as e:
             self._last_error = str(e)
             logger.error(f"Failed to fetch NSE announcements: {e}")
+            return []
+
+    def fetch_circulars(self, max_items: int = 20) -> List[NewsItemCreate]:
+        """Fetches official NSE exchange circulars and notices."""
+        if not self._ensure_session():
+            return []
+        circulars: List[NewsItemCreate] = []
+        try:
+            kwargs = self._get_request_kwargs()
+            kwargs["headers"] = {"Referer": "https://www.nseindia.com/"}
+            resp = self.session.get(self.CIRCULARS_URL, **kwargs)
+            if resp.status_code != 200:
+                return []
+            data = resp.json().get("data", [])
+            for entry in data[:max_items]:
+                sub = clean_text(entry.get("sub") or "")
+                file_link = entry.get("circFilelink") or entry.get("file")
+                cir_date = entry.get("cirDate")
+                cir_no = str(entry.get("cirNumber") or cir_date or sub[:20])
+
+                if not sub:
+                    continue
+
+                published_at = self._parse_nse_datetime(cir_date)
+                category = categorize_announcement(sub)
+
+                item = NewsItemCreate(
+                    ticker="NSE_CIRCULAR",
+                    title=f"[NSE Circular] {sub}",
+                    description=f"Exchange Circular No: {cir_no}",
+                    source="nse",
+                    source_url=file_link,
+                    source_id=f"nse_circ_{cir_no.replace('/', '_')}",
+                    category=category if category != "general" else "regulatory",
+                    published_at=published_at,
+                )
+                circulars.append(item)
+
+            logger.info(f"NSE Scraper retrieved {len(circulars)} circular items.")
+            return circulars
+        except Exception as e:
+            logger.warning(f"Failed to fetch NSE circulars: {e}")
+            return []
+
+    def get_market_indices(self) -> List[dict]:
+        """Fetches real-time benchmark index levels (NIFTY 50, BANK NIFTY, INDIA VIX, etc.)."""
+        if not self._ensure_session():
+            return []
+        try:
+            kwargs = self._get_request_kwargs()
+            kwargs["headers"] = {"Referer": "https://www.nseindia.com/"}
+            resp = self.session.get(self.ALL_INDICES_URL, **kwargs)
+            if resp.status_code != 200:
+                return []
+            data = resp.json().get("data", [])
+            indices = []
+            for item in data:
+                name = item.get("index")
+                if name in ("NIFTY 50", "NIFTY BANK", "NIFTY IT", "INDIA VIX", "NIFTY NEXT 50", "NIFTY MIDCAP 100"):
+                    indices.append({
+                        "name": name,
+                        "last": item.get("last"),
+                        "change": item.get("variation"),
+                        "percent_change": item.get("percentChange"),
+                        "open": item.get("open"),
+                        "high": item.get("high"),
+                        "low": item.get("low"),
+                    })
+            return indices
+        except Exception as e:
+            logger.warning(f"Failed to fetch market indices: {e}")
             return []

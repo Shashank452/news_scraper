@@ -75,6 +75,10 @@ def categorize_announcement(title: str, description: Optional[str] = None) -> st
     """
     text = f"{title} {description or ''}".lower()
 
+    if any(k in text for k in ["gsm", "graded surveillance", "asm", "additional surveillance"]):
+        return "surveillance_asm_gsm"
+    if any(k in text for k in ["price band", "circuit limit", "circuit filter"]):
+        return "circuit_price_band"
     if any(k in text for k in ["financial result", "quarterly result", "audited result", "unaudited result", "q1", "q2", "q3", "q4"]):
         return "financial_results"
     if any(k in text for k in ["board meeting", "outcome of board meeting", "board to consider"]):

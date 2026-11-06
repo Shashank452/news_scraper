@@ -25,6 +25,7 @@ class BSEScraper(BaseScraper):
     """
 
     RSS_FEED_URL = "https://www.bseindia.com/data/xml/announcements.aspx"
+    NOTICES_FEED_URL = "https://www.bseindia.com/data/xml/notices.aspx"
     API_URL = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
     ATTACHMENT_BASE_URL = "https://www.bseindia.com/xml-data/corpfiling/AttachLive"
 
@@ -124,9 +125,60 @@ class BSEScraper(BaseScraper):
 
             self._last_error = None
             logger.info(f"BSE Scraper retrieved {len(items)} announcement items.")
+
+            # Also fetch latest regulatory notices & circulars (ASM/GSM, price bands, etc.)
+            notices = self.fetch_notices(max_items=25)
+            items.extend(notices)
+
             return items
 
         except Exception as e:
             self._last_error = str(e)
             logger.error(f"Failed to fetch BSE announcements: {e}")
+            return []
+
+    def fetch_notices(self, max_items: int = 25) -> List[NewsItemCreate]:
+        """
+        Fetches official BSE circulars, price band changes, and ASM/GSM surveillance notices.
+        """
+        notices: List[NewsItemCreate] = []
+        try:
+            resp = self.session.get(self.NOTICES_FEED_URL, timeout=self.timeout)
+            if resp.status_code != 200:
+                return []
+            root = ET.fromstring(resp.content)
+            channel = root.find("channel")
+            if channel is None:
+                return []
+
+            for entry in channel.findall("item")[:max_items]:
+                raw_title = clean_text(entry.findtext("title"))
+                link = entry.findtext("link")
+                pub_date_str = entry.findtext("pubDate")
+
+                if not raw_title:
+                    continue
+
+                published_at = self._parse_bse_datetime(pub_date_str)
+                category = categorize_announcement(raw_title)
+
+                # Generate unique ID from URL (e.g. 20261106-31)
+                source_id = "notice_" + (link.split("/")[-1].replace(".pdf", "") if link else published_at.strftime("%Y%m%d%H%M%S"))
+
+                item = NewsItemCreate(
+                    ticker="BSE_CIRCULAR",
+                    title=f"[BSE Circular] {raw_title}",
+                    description=f"Official BSE Market Notice: {raw_title}",
+                    source="bse",
+                    source_url=link,
+                    source_id=f"bse_{source_id}",
+                    category=category if category != "general" else "regulatory",
+                    published_at=published_at,
+                )
+                notices.append(item)
+
+            logger.info(f"BSE Scraper retrieved {len(notices)} surveillance and circular notices.")
+            return notices
+        except Exception as e:
+            logger.warning(f"Failed to fetch BSE notices feed: {e}")
             return []

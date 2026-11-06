@@ -111,3 +111,19 @@ def test_export_file():
     assert resp_csv.status_code == 200
     assert "RELIANCE" in resp_csv.text
     assert "TCS" in resp_csv.text
+
+
+def test_ui_and_stats():
+    # Test UI HTML page serving
+    resp_ui = client.get("/ui")
+    assert resp_ui.status_code == 200
+    assert "Indian Equities News Terminal" in resp_ui.text
+
+    # Test stats endpoint
+    resp_stats = client.get("/stats")
+    assert resp_stats.status_code == 200
+    data = resp_stats.json()
+    assert data["total_news"] == 2
+    assert "bse_count" in data
+    assert "nse_count" in data
+    assert "is_market_hours" in data

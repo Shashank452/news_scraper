@@ -1,21 +1,25 @@
 """
 REST API for News Scraper Service.
-Provides endpoints for querying, filtering, exporting, and triggering news scraping.
+Provides endpoints for querying, filtering, exporting, triggering news scraping,
+and serving the interactive testing web UI.
 """
 
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Header, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import desc, select
+from fastapi.responses import HTMLResponse
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from config import settings
+from config import is_market_hours, settings
 from database import NewsItemRecord, get_db, init_db
 from exporters.news_exporter import export_to_csv, export_to_json
 from news_model import NewsItemResponse
 from aggregators.news_aggregator import NewsAggregator
+from scrapers.nse_scraper import NSEScraper
 from utils import logger
 
 
@@ -33,28 +37,54 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Enable CORS for internal dashboards or frontend consumers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> bool:
+UI_HTML_PATH = Path(__file__).parent.parent / "ui" / "index.html"
+
+
+def verify_api_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key_query: Optional[str] = Query(None, alias="api_key"),
+) -> bool:
     """
-    Validates internal API-key header.
-    If settings.api_key is set to empty or 'none', authentication is bypassed.
+    Validates internal API-key.
+    Bypasses authentication if key is not configured or explicitly disabled.
     """
+    provided_key = x_api_key or api_key_query
     if not settings.api_key or settings.api_key.lower() in ("none", "disabled"):
         return True
 
-    if not x_api_key or x_api_key != settings.api_key:
+    if not provided_key or provided_key != settings.api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing X-API-Key header",
+            detail="Invalid or missing API Key header (X-API-Key)",
         )
     return True
+
+
+@app.get("/", response_class=HTMLResponse, tags=["UI"])
+@app.get("/ui", response_class=HTMLResponse, tags=["UI"])
+def serve_ui():
+    """Serves the interactive web UI for testing and viewing live announcements."""
+    if UI_HTML_PATH.exists():
+        html_content = UI_HTML_PATH.read_text(encoding="utf-8")
+        # Inject API key so browser requests are automatically authorized
+        html_content = html_content.replace("{{API_KEY}}", settings.api_key or "")
+        return HTMLResponse(content=html_content)
+    return HTMLResponse("<h3>UI template not found</h3>", status_code=404)
 
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
     """Health check endpoint verifying system & database readiness."""
     try:
-        # Check DB connection
         db.execute(select(1)).scalar_one()
         db_status = "connected"
     except Exception as e:
@@ -64,8 +94,39 @@ def health_check(db: Session = Depends(get_db)):
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
+        "is_market_hours": is_market_hours(),
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+@app.get("/stats", tags=["Stats"])
+def get_stats(db: Session = Depends(get_db)):
+    """Provides high-level announcement counts and market status for the UI dashboard."""
+    total = db.query(NewsItemRecord).count()
+    bse = db.query(NewsItemRecord).filter(NewsItemRecord.source == "bse").count()
+    nse = db.query(NewsItemRecord).filter(NewsItemRecord.source == "nse").count()
+    categories_raw = (
+        db.query(NewsItemRecord.category, func.count(NewsItemRecord.id))
+        .group_by(NewsItemRecord.category)
+        .all()
+    )
+    categories = {cat or "general": count for cat, count in categories_raw}
+
+    return {
+        "total_news": total,
+        "bse_count": bse,
+        "nse_count": nse,
+        "categories": categories,
+        "is_market_hours": is_market_hours(),
+    }
+
+
+@app.get("/market/indices", tags=["Market"])
+def get_market_indices():
+    """Returns live snapshot of major benchmark indices (NIFTY 50, BANK NIFTY, INDIA VIX)."""
+    scraper = NSEScraper()
+    indices = scraper.get_market_indices()
+    return indices
 
 
 @app.get(
@@ -87,7 +148,11 @@ def get_news(
     stmt = select(NewsItemRecord).order_by(desc(NewsItemRecord.published_at))
 
     if ticker:
-        stmt = stmt.where(NewsItemRecord.ticker == ticker.upper())
+        # Match either exact ticker or contains ticker substring (supports scrip codes)
+        stmt = stmt.where(
+            (NewsItemRecord.ticker == ticker.upper())
+            | (NewsItemRecord.title.ilike(f"%{ticker}%"))
+        )
     if source:
         stmt = stmt.where(NewsItemRecord.source == source.lower())
     if category:

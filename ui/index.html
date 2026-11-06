@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indian Equities News Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & Status -->
+      <div class="flex items-center space-x-4">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+          IN
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="font-bold text-lg tracking-tight text-white">Indian Equities News Terminal</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span> LIVE FEED
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">BSE & NSE Real-Time Disclosures, Circulars & Surveillance</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-3">
+        <!-- Market Hours Indicator -->
+        <div id="market-status-pill" class="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+          Checking market...
+        </div>
+
+        <!-- Export Dropdown -->
+        <div class="relative inline-block text-left">
+          <button id="export-btn" onclick="toggleExportMenu()" class="inline-flex items-center px-3 py-1.5 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 bg-slate-800/80 hover:bg-slate-700 transition">
+            <svg class="w-4 h-4 mr-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export
+          </button>
+          <div id="export-menu" class="hidden absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-slate-900 border border-slate-700 ring-1 ring-black ring-opacity-5 z-40">
+            <div class="py-1">
+              <a href="/news/export/file?format=csv&api_key={{API_KEY}}" class="block px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white">Download CSV</a>
+              <a href="/news/export/file?format=json&api_key={{API_KEY}}" class="block px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white">Download JSON</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trigger Live Scrape Button -->
+        <button id="trigger-scrape-btn" onclick="triggerScrape()" class="inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition">
+          <svg id="scrape-icon" class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span id="scrape-text">Trigger Scrape</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Live Market Indices Ticker Bar -->
+  <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 text-xs overflow-x-auto">
+    <div class="max-w-7xl mx-auto flex items-center space-x-6 whitespace-nowrap" id="indices-container">
+      <span class="text-slate-500 font-medium">Indices:</span>
+      <span class="text-slate-400">Loading benchmark market indices...</span>
+    </div>
+  </div>
+
+  <!-- Notification Banner -->
+  <div id="toast-banner" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
+    <div class="p-3 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs flex items-center justify-between">
+      <span id="toast-message">Cycle completed</span>
+      <button onclick="document.getElementById('toast-banner').classList.add('hidden')" class="text-indigo-400 hover:text-white">&times;</button>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col space-y-6">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-slate-400 text-xs font-medium">Total Stored News</div>
+        <div class="text-2xl font-bold text-white mt-1 mono" id="stat-total">--</div>
+        <div class="text-[11px] text-slate-500 mt-1">Deduplicated in DB</div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-slate-400 text-xs font-medium">BSE Announcements</div>
+        <div class="text-2xl font-bold text-sky-400 mt-1 mono" id="stat-bse">--</div>
+        <div class="text-[11px] text-slate-500 mt-1">Direct corporate XML feed</div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-slate-400 text-xs font-medium">NSE Announcements</div>
+        <div class="text-2xl font-bold text-amber-400 mt-1 mono" id="stat-nse">--</div>
+        <div class="text-[11px] text-slate-500 mt-1">Equities JSON API</div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-slate-400 text-xs font-medium">Active Categories</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1 mono" id="stat-categories">--</div>
+        <div class="text-[11px] text-slate-500 mt-1">Results, Board, Dividend, etc.</div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        
+        <!-- Search Keyword / Ticker -->
+        <div class="md:col-span-2 relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input 
+            type="text" 
+            id="search-input" 
+            placeholder="Search company, ticker (e.g. RELIANCE, TCS) or headline..." 
+            class="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+            oninput="debounceSearch()"
+          />
+        </div>
+
+        <!-- Source Filter -->
+        <div>
+          <select id="source-filter" onchange="fetchNews()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+            <option value="">All Sources (BSE + NSE)</option>
+            <option value="bse">BSE India only</option>
+            <option value="nse">NSE India only</option>
+          </select>
+        </div>
+
+        <!-- Category Filter -->
+        <div>
+          <select id="category-filter" onchange="fetchNews()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+            <option value="">All Categories</option>
+            <option value="financial_results">Financial Results</option>
+            <option value="board_meeting">Board Meeting</option>
+            <option value="dividend">Dividends</option>
+            <option value="acquisition_merger">Acquisitions & Mergers</option>
+            <option value="surveillance_asm_gsm">ASM / GSM Surveillance</option>
+            <option value="circuit_price_band">Price Bands & Circuits</option>
+            <option value="order_contract">Orders & Contracts</option>
+            <option value="management_change">Management Change</option>
+            <option value="regulatory">Regulatory & Circulars</option>
+            <option value="general">General / Other</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Quick Ticker Filter Pills -->
+      <div class="flex items-center space-x-2 pt-1 text-xs text-slate-400 overflow-x-auto">
+        <span class="text-slate-500">Quick Filters:</span>
+        <button onclick="setTickerFilter('')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">All</button>
+        <button onclick="setTickerFilter('RELIANCE')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">RELIANCE</button>
+        <button onclick="setTickerFilter('TCS')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">TCS</button>
+        <button onclick="setTickerFilter('INFY')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">INFY</button>
+        <button onclick="setTickerFilter('HDFCBANK')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">HDFCBANK</button>
+        <button onclick="setTickerFilter('POLYPLEX')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">POLYPLEX</button>
+        <button onclick="setCategoryFilter('financial_results')" class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/50 hover:bg-emerald-900 transition">Q3/Q4 Results</button>
+        <button onclick="setCategoryFilter('surveillance_asm_gsm')" class="px-2.5 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800/50 hover:bg-rose-900 transition">ASM/GSM</button>
+      </div>
+    </div>
+
+    <!-- Feed Header & Count -->
+    <div class="flex items-center justify-between text-xs text-slate-400">
+      <div>
+        Showing <span id="items-count" class="font-semibold text-slate-200">0</span> announcements
+      </div>
+      <div class="flex items-center space-x-2">
+        <span>Rows:</span>
+        <select id="limit-select" onchange="fetchNews()" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Announcements Feed List -->
+    <div id="feed-container" class="space-y-3">
+      <div class="text-center py-12 text-slate-500">Loading disclosures...</div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+    Indian Stock Market Real-Time News Scraper & Aggregator &bull; FastAPI + PostgreSQL &bull; Open Architecture
+  </footer>
+
+  <script>
+    const API_KEY = "{{API_KEY}}";
+    let searchTimeout = null;
+
+    function getAuthHeaders() {
+      const headers = {};
+      if (API_KEY) {
+        headers['X-API-Key'] = API_KEY;
+      }
+      return headers;
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(fetchNews, 300);
+    }
+
+    function toggleExportMenu() {
+      const menu = document.getElementById('export-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    function setTickerFilter(ticker) {
+      document.getElementById('search-input').value = ticker;
+      fetchNews();
+    }
+
+    function setCategoryFilter(category) {
+      document.getElementById('category-filter').value = category;
+      fetchNews();
+    }
+
+    function getCategoryBadge(cat) {
+      const map = {
+        'financial_results': { bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', label: 'Results' },
+        'board_meeting': { bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30', label: 'Board Meeting' },
+        'dividend': { bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', label: 'Dividend' },
+        'acquisition_merger': { bg: 'bg-purple-500/10 text-purple-400 border-purple-500/30', label: 'Acquisition' },
+        'surveillance_asm_gsm': { bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', label: 'ASM / GSM' },
+        'circuit_price_band': { bg: 'bg-orange-500/10 text-orange-400 border-orange-500/30', label: 'Price Band' },
+        'order_contract': { bg: 'bg-teal-500/10 text-teal-400 border-teal-500/30', label: 'Order / Win' },
+        'management_change': { bg: 'bg-blue-500/10 text-blue-400 border-blue-500/30', label: 'Leadership' },
+        'regulatory': { bg: 'bg-slate-500/10 text-slate-300 border-slate-500/30', label: 'Circular' },
+        'general': { bg: 'bg-slate-800 text-slate-400 border-slate-700', label: 'General' },
+      };
+      const badge = map[cat] || map['general'];
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${badge.bg}">${badge.label}</span>`;
+    }
+
+    function formatTime(isoStr) {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }) + ' IST';
+      } catch (e) {
+        return isoStr;
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('stat-total').innerText = data.total_news.toLocaleString();
+        document.getElementById('stat-bse').innerText = data.bse_count.toLocaleString();
+        document.getElementById('stat-nse').innerText = data.nse_count.toLocaleString();
+        document.getElementById('stat-categories').innerText = Object.keys(data.categories || {}).length;
+
+        const pill = document.getElementById('market-status-pill');
+        if (data.is_market_hours) {
+          pill.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+          pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span> Market OPEN`;
+        } else {
+          pill.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700";
+          pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Market CLOSED`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadIndices() {
+      try {
+        const res = await fetch('/market/indices');
+        if (!res.ok) return;
+        const items = await res.json();
+        if (!items || items.length === 0) return;
+
+        const container = document.getElementById('indices-container');
+        let html = '<span class="text-slate-500 font-semibold uppercase tracking-wider">Indices:</span>';
+        items.forEach(it => {
+          const isUp = it.percent_change >= 0;
+          const colorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
+          const sign = isUp ? '+' : '';
+          html += `
+            <div class="inline-flex items-center space-x-1.5 border-r border-slate-800 pr-5">
+              <span class="font-medium text-slate-300">${it.name}:</span>
+              <span class="mono font-semibold text-slate-100">${it.last ? it.last.toLocaleString() : '--'}</span>
+              <span class="mono text-[11px] ${colorClass}">(${sign}${it.percent_change}%)</span>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchNews() {
+      const feed = document.getElementById('feed-container');
+      const search = document.getElementById('search-input').value.trim();
+      const source = document.getElementById('source-filter').value;
+      const category = document.getElementById('category-filter').value;
+      const limit = document.getElementById('limit-select').value;
+
+      let url = `/news?limit=${limit}`;
+      if (search) {
+        // If single word without spaces, filter by ticker or title
+        if (!search.includes(' ')) {
+          url += `&ticker=${encodeURIComponent(search)}`;
+        }
+      }
+      if (source) url += `&source=${encodeURIComponent(source)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+
+      try {
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to load news');
+        let items = await res.json();
+
+        // Secondary client-side text filtering if search phrase has multiple words
+        if (search && search.includes(' ')) {
+          const query = search.toLowerCase();
+          items = items.filter(it => 
+            (it.title && it.title.toLowerCase().includes(query)) ||
+            (it.description && it.description.toLowerCase().includes(query))
+          );
+        }
+
+        document.getElementById('items-count').innerText = items.length;
+
+        if (items.length === 0) {
+          feed.innerHTML = `
+            <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-8 text-center text-slate-500 text-sm">
+              No corporate announcements match your current filter criteria.
+            </div>
+          `;
+          return;
+        }
+
+        let html = '';
+        items.forEach(it => {
+          const sourceBadge = it.source === 'bse'
+            ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">BSE</span>'
+            : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">NSE</span>';
+
+          const docLink = it.source_url
+            ? `<a href="${it.source_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 transition">
+                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                 <span>View PDF</span>
+               </a>`
+            : '';
+
+          html += `
+            <div class="bg-slate-900/80 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-4 transition duration-150">
+              <div class="flex items-start justify-between gap-4">
+                
+                <div class="space-y-1.5 flex-1">
+                  <!-- Header row: Ticker, Source, Category, Timestamp -->
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="setTickerFilter('${it.ticker || ''}')" class="font-bold text-white mono hover:text-indigo-400 transition">
+                      ${it.ticker || 'UNLISTED'}
+                    </button>
+                    ${sourceBadge}
+                    ${getCategoryBadge(it.category)}
+                    <span class="text-xs text-slate-500 mono">${formatTime(it.published_at)}</span>
+                  </div>
+
+                  <!-- Headline -->
+                  <div class="text-sm font-semibold text-slate-100 leading-snug">
+                    ${it.title}
+                  </div>
+
+                  <!-- Description Preview if present -->
+                  ${it.description ? `<p class="text-xs text-slate-400 line-clamp-2">${it.description}</p>` : ''}
+                </div>
+
+                <!-- Action Button -->
+                <div class="flex items-center space-x-2 shrink-0">
+                  ${docLink}
+                </div>
+
+              </div>
+            </div>
+          `;
+        });
+
+        feed.innerHTML = html;
+      } catch (e) {
+        feed.innerHTML = `<div class="p-6 text-center text-rose-400 text-sm">Failed to load feed: ${e.message}</div>`;
+      }
+    }
+
+    async function triggerScrape() {
+      const btn = document.getElementById('trigger-scrape-btn');
+      const text = document.getElementById('scrape-text');
+      const icon = document.getElementById('scrape-icon');
+      const toast = document.getElementById('toast-banner');
+      const toastMsg = document.getElementById('toast-message');
+
+      btn.disabled = true;
+      text.innerText = 'Scraping live...';
+      icon.classList.add('animate-spin');
+
+      try {
+        const res = await fetch('/news/trigger-scrape', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        
+        let summaryText = 'Cycle completed. ';
+        if (data.summary) {
+          const bse = data.summary.bse || {};
+          const nse = data.summary.nse || {};
+          summaryText += `BSE: ${bse.total_fetched || 0} fetched (${bse.new_inserted || 0} new), NSE: ${nse.total_fetched || 0} fetched (${nse.new_inserted || 0} new).`;
+        }
+
+        toastMsg.innerText = summaryText;
+        toast.classList.remove('hidden');
+
+        await loadStats();
+        await fetchNews();
+      } catch (e) {
+        toastMsg.innerText = 'Scrape request failed: ' + e.message;
+        toast.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        text.innerText = 'Trigger Scrape';
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadStats();
+      loadIndices();
+      fetchNews();
+      // Auto-refresh stats and indices every 30 seconds
+      setInterval(() => {
+        loadStats();
+        loadIndices();
+      }, 30000);
+    });
+  </script>
+</body>
+</html>
