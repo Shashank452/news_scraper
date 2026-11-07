@@ -147,6 +147,14 @@ class MediaNewsScraper(BaseScraper):
         except Exception as e:
             logger.warning(f"Failed to fetch Moneycontrol feed: {e}")
 
+        # 3. World & Global Macro News Feed
+        try:
+            world_items = self.fetch_world_and_macro_news(max_items=max_items_per_source)
+            items.extend(world_items)
+            logger.info(f"World & Macro scraper fetched {len(world_items)} articles.")
+        except Exception as e:
+            logger.warning(f"Failed to fetch World & Macro news during fetch_latest: {e}")
+
         return items
 
     def search_news(
@@ -238,71 +246,104 @@ class MediaNewsScraper(BaseScraper):
             logger.error(f"Error executing news search: {e}")
             return []
 
+    WORLD_NEWS_FEEDS = [
+        {"name": "BBC World", "url": "https://feeds.bbci.co.uk/news/world/rss.xml"},
+        {"name": "The Guardian World", "url": "https://www.theguardian.com/world/rss"},
+        {"name": "DW English", "url": "https://rss.dw.com/xml/rss-en-all"},
+        {"name": "Global Macro & Markets", "url": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en"},
+    ]
+
     def fetch_world_and_macro_news(self, max_items: int = 30) -> List[NewsItemCreate]:
         """
-        Fetches global financial markets, US Federal Reserve, crude oil/commodities,
-        and world macroeconomic news affecting Indian equities.
+        Fetches global financial markets, geopolitics, US Federal Reserve, crude oil/commodities,
+        and world macroeconomic news affecting Indian equities from top global outlets (BBC, The Guardian, DW, Reuters).
         """
-        self.rate_limiter.wait()
         items: List[NewsItemCreate] = []
+        seen_keys = set()
+        per_feed_limit = max(5, max_items // len(self.WORLD_NEWS_FEEDS))
 
-        # Google News Global Business / Macro RSS
-        url = "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en"
-
-        try:
-            logger.info("Fetching World & Global Macro business news...")
-            resp = self.session.get(url, timeout=self.timeout)
-            if resp.status_code != 200:
-                return []
-
-            root = ET.fromstring(resp.content)
-            channel = root.find("channel")
-            if channel is None:
-                return []
-
-            for it in channel.findall("item")[:max_items]:
-                raw_title = clean_text(it.findtext("title"))
-                link = it.findtext("link")
-                raw_desc = clean_text(it.findtext("description"))
-                pub_date = self._parse_rfc822_date(it.findtext("pubDate"))
-
-                if not raw_title:
+        for feed in self.WORLD_NEWS_FEEDS:
+            feed_name = feed["name"]
+            feed_url = feed["url"]
+            try:
+                self.rate_limiter.wait()
+                logger.info(f"Fetching world news from {feed_name}...")
+                resp = self.session.get(feed_url, timeout=self.timeout)
+                if resp.status_code != 200:
+                    logger.warning(f"Failed to fetch {feed_name}: status {resp.status_code}")
                     continue
 
-                headline = raw_title
-                publisher = "Global Wire"
-                if " - " in raw_title:
-                    parts = raw_title.rsplit(" - ", 1)
-                    headline = parts[0].strip()
-                    publisher = parts[1].strip()
+                root = ET.fromstring(resp.content)
+                channel = root.find("channel")
+                if channel is None:
+                    # In some feeds root is rdf or atom
+                    channel = root
 
-                # Infer sector/ticker tag
-                text = f"{headline} {raw_desc}".lower()
-                ticker = "GLOBAL_MACRO"
-                if any(k in text for k in ["crude", "oil", "opec", "brent"]):
-                    ticker = "CRUDE_OIL, ONGC, RELIANCE, BPCL"
-                elif any(k in text for k in ["fed", "federal reserve", "powell", "us inflation", "treasury"]):
-                    ticker = "US_FED, IT_SECTOR, TCS, INFY"
-                elif any(k in text for k in ["gold", "precious metal"]):
-                    ticker = "GOLD, TITAN, KALYANKJIL"
+                count = 0
+                for it in channel.findall(".//item"):
+                    if count >= per_feed_limit:
+                        break
 
-                source_id = hashlib.sha256((link or headline).encode()).hexdigest()[:16]
+                    raw_title = clean_text(it.findtext("title"))
+                    link = it.findtext("link")
+                    raw_desc = clean_text(it.findtext("description"))
+                    pub_date = self._parse_rfc822_date(it.findtext("pubDate"))
 
-                item = NewsItemCreate(
-                    ticker=ticker,
-                    title=f"[World News - {publisher}] {headline}",
-                    description=raw_desc if raw_desc else f"Global market report by {publisher}",
-                    source="world_news",
-                    source_url=link,
-                    source_id=f"world_{source_id}",
-                    category="global_macro",
-                    published_at=pub_date,
-                )
-                items.append(item)
+                    if not raw_title:
+                        continue
 
-            logger.info(f"Retrieved {len(items)} World and Macro news articles.")
-            return items
+                    # Clean headline
+                    headline = raw_title
+                    if " - " in raw_title and feed_name == "Global Macro & Markets":
+                        tokens = raw_title.rsplit(" - ", 1)
+                        headline = tokens[0].strip()
+                        publisher = tokens[1].strip()
+                    else:
+                        publisher = feed_name
 
-        except Exception as e:
-            logger.warning(f"Failed to fetch world news: {e}")
-            return []
+                    key = link or headline
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+
+                    # Infer sector/ticker tag based on macro themes
+                    text = f"{headline} {raw_desc}".lower()
+                    ticker = "GLOBAL_MACRO"
+                    if any(k in text for k in ["crude", "oil", "opec", "brent", "petroleum", "energy"]):
+                        ticker = "CRUDE_OIL, ONGC, RELIANCE, BPCL, IOC"
+                    elif any(k in text for k in ["fed", "federal reserve", "powell", "inflation", "treasury", "interest rate", "wall street", "nasdaq", "dow"]):
+                        ticker = "US_FED, IT_SECTOR, TCS, INFY, HCLTECH"
+                    elif any(k in text for k in ["gold", "precious metal", "silver", "bullion"]):
+                        ticker = "GOLD, TITAN, KALYANKJIL, MUTHOOTFIN"
+                    elif any(k in text for k in ["tariff", "trade war", "steel", "aluminum", "metals"]):
+                        ticker = "METALS, TATASTEEL, JSWSTEEL, HINDALCO"
+                    elif any(k in text for k in ["pharma", "fda", "drug", "healthcare"]):
+                        ticker = "PHARMA, SUNPHARMA, DRREDDY, CIPLA"
+                    elif any(k in text for k in ["auto", "electric vehicle", "ev", "car"]):
+                        ticker = "AUTO, TATAMOTORS, M&M, MARUTI"
+                    elif any(k in text for k in ["bank", "central bank", "ecb", "boj", "dollar", "currency"]):
+                        ticker = "BANKING_SECTOR, HDFCBANK, ICICIBANK, SBIN"
+
+                    source_id = hashlib.sha256(key.encode()).hexdigest()[:16]
+
+                    item = NewsItemCreate(
+                        ticker=ticker[:140],
+                        title=f"[{publisher}] {headline}",
+                        description=raw_desc if raw_desc else f"World report by {publisher}",
+                        source="world_news",
+                        source_url=link,
+                        source_id=f"world_{source_id}",
+                        category="global_macro",
+                        published_at=pub_date,
+                    )
+                    items.append(item)
+                    count += 1
+
+                logger.info(f"Retrieved {count} articles from {feed_name}.")
+
+            except Exception as e:
+                logger.warning(f"Error fetching {feed_name}: {e}")
+                continue
+
+        logger.info(f"Total World & Macro articles fetched: {len(items)}")
+        return items

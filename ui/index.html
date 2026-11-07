@@ -2,27 +2,48 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Indian Equities News Terminal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
+        screens: {
+          'xs': '440px',
+          'sm': '640px',
+          'md': '768px',
+          'lg': '1024px',
+          'xl': '1280px',
+          '2xl': '1536px',
+          '3xl': '1920px',
+          'tv': '2560px'
+        },
         extend: {
           fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
             brand: {
               50: '#eef2ff',
+              100: '#e0e7ff',
               500: '#6366f1',
               600: '#4f46e5',
               900: '#312e81',
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'marquee': 'marquee 35s linear infinite',
+          },
+          keyframes: {
+            marquee: {
+              '0%': { transform: 'translateX(0%)' },
+              '100%': { transform: 'translateX(-50%)' }
             }
           }
         }
@@ -30,146 +51,309 @@
     }
   </script>
   <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { 
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif; 
+      -webkit-tap-highlight-color: transparent;
+    }
     .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Custom sleek scrollbars */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Hide scrollbar for clean horizontal swipe on mobile & TV */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* TV 10-foot mode scaling */
+    body.tv-mode {
+      font-size: 1.15rem;
+    }
+    body.tv-mode .tv-scale-header {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    body.tv-mode .tv-scale-title {
+      font-size: 1.75rem;
+      line-height: 2rem;
+    }
+    body.tv-mode .tv-scale-stat {
+      font-size: 2.75rem;
+      line-height: 1.1;
+    }
+    body.tv-mode .tv-scale-headline {
+      font-size: 1.25rem;
+      line-height: 1.4;
+    }
+    body.tv-mode .tv-scale-desc {
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+    body.tv-mode .tv-card {
+      padding: 1.5rem;
+    }
+    body.tv-mode .tv-badge {
+      font-size: 0.85rem;
+      padding: 0.25rem 0.65rem;
+    }
+
+    /* Active remote/keyboard navigation focus ring */
+    .news-card-focused {
+      outline: 3px solid #6366f1 !important;
+      box-shadow: 0 0 25px rgba(99, 102, 241, 0.45) !important;
+      background-color: #0f172a !important;
+    }
+
+    /* Marquee pause on hover */
+    .marquee-container:hover .marquee-track {
+      animation-play-state: paused;
+    }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-white transition-all duration-200">
 
   <!-- Top Navigation Bar -->
-  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      
-      <!-- Logo & Status -->
-      <div class="flex items-center space-x-4">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-          IN
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="font-bold text-lg tracking-tight text-white">Indian Equities News Terminal</h1>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span> LIVE FEED
-            </span>
+  <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 transition-all tv-scale-header">
+    <div class="w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[1920px] tv:max-w-[2400px] mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16 sm:h-18 gap-2">
+        
+        <!-- Left: Logo & Title -->
+        <div class="flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center font-extrabold text-white text-sm sm:text-base shadow-lg shadow-indigo-500/25 shrink-0 ring-1 ring-white/20">
+            IN
           </div>
-          <p class="text-xs text-slate-400">BSE & NSE Real-Time Disclosures, Circulars & Surveillance</p>
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2">
+              <h1 class="font-bold text-sm sm:text-base lg:text-lg tracking-tight text-white truncate tv-scale-title">
+                <span class="hidden xs:inline">Indian Equities</span>
+                <span class="xs:hidden">Equities</span> News Terminal
+              </h1>
+              <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-fast mr-1 sm:mr-1.5"></span>
+                LIVE
+              </span>
+            </div>
+            <p class="hidden md:block text-[11px] lg:text-xs text-slate-400 truncate">
+              BSE & NSE Real-Time Disclosures, Circulars, Surveillance & Macro Intelligence
+            </p>
+          </div>
         </div>
-      </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center space-x-3">
-        <!-- Market Hours Indicator -->
-        <div id="market-status-pill" class="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-          Checking market...
-        </div>
+        <!-- Right: Actions, Clock, Device Controls -->
+        <div class="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
+          
+          <!-- Live IST Clock (Visible on desktop, laptop & TV) -->
+          <div class="hidden lg:flex flex-col items-end pr-2 border-r border-slate-800">
+            <div class="mono text-xs font-semibold text-slate-200" id="live-clock">--:--:-- IST</div>
+            <div class="text-[10px] text-slate-500">Asia/Kolkata</div>
+          </div>
 
-        <!-- Export Dropdown -->
-        <div class="relative inline-block text-left">
-          <button id="export-btn" onclick="toggleExportMenu()" class="inline-flex items-center px-3 py-1.5 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 bg-slate-800/80 hover:bg-slate-700 transition">
-            <svg class="w-4 h-4 mr-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Export
+          <!-- Market Hours Status Badge -->
+          <div id="market-status-pill" class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700/80">
+            <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span>
+            Checking market...
+          </div>
+
+          <!-- TV / Presentation Mode Toggle -->
+          <button 
+            id="tv-mode-btn" 
+            onclick="toggleTvMode()" 
+            title="Toggle TV / 10-foot Presentation Mode (Shortcut: T)" 
+            class="inline-flex items-center px-2.5 sm:px-3 py-1.5 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 hover:text-white transition"
+          >
+            <svg class="w-3.5 h-3.5 sm:mr-1.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            <span class="hidden sm:inline" id="tv-mode-label">TV Mode</span>
           </button>
-          <div id="export-menu" class="hidden absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-slate-900 border border-slate-700 ring-1 ring-black ring-opacity-5 z-40">
-            <div class="py-1">
-              <a href="/news/export/file?format=csv&api_key={{API_KEY}}" class="block px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white">Download CSV</a>
-              <a href="/news/export/file?format=json&api_key={{API_KEY}}" class="block px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white">Download JSON</a>
+
+          <!-- Fullscreen Toggle (Great for TV & Multi-monitor setups) -->
+          <button 
+            id="fullscreen-btn" 
+            onclick="toggleFullscreen()" 
+            title="Fullscreen Toggle (Shortcut: F)" 
+            class="hidden md:inline-flex items-center p-1.5 sm:px-2.5 sm:py-1.5 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 hover:text-white transition"
+          >
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
+          </button>
+
+          <!-- Export Dropdown -->
+          <div class="relative inline-block text-left">
+            <button 
+              id="export-btn" 
+              onclick="toggleExportMenu()" 
+              class="inline-flex items-center px-2.5 sm:px-3 py-1.5 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-200 bg-slate-800/80 hover:bg-slate-700 transition"
+              aria-label="Export Menu"
+            >
+              <svg class="w-3.5 h-3.5 sm:mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              <span class="hidden xs:inline">Export</span>
+            </button>
+            <div id="export-menu" class="hidden absolute right-0 mt-2 w-44 rounded-xl shadow-2xl bg-slate-900 border border-slate-700 ring-1 ring-black/50 z-50 overflow-hidden divide-y divide-slate-800">
+              <div class="p-1">
+                <a href="/news/export/file?format=csv&api_key={{API_KEY}}" class="flex items-center px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600 hover:text-white rounded-lg transition">
+                  <svg class="w-3.5 h-3.5 mr-2 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>
+                  Download CSV
+                </a>
+                <a href="/news/export/file?format=json&api_key={{API_KEY}}" class="flex items-center px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600 hover:text-white rounded-lg transition">
+                  <svg class="w-3.5 h-3.5 mr-2 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>
+                  Download JSON
+                </a>
+              </div>
             </div>
           </div>
+
+          <!-- Trigger Live Scrape Button -->
+          <button 
+            id="trigger-scrape-btn" 
+            onclick="triggerScrape()" 
+            class="inline-flex items-center px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition active:scale-95"
+          >
+            <svg id="scrape-icon" class="w-3.5 h-3.5 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span id="scrape-text" class="hidden xs:inline">Trigger Scrape</span>
+            <span class="xs:hidden">Scrape</span>
+          </button>
+
         </div>
 
-        <!-- Trigger Live Scrape Button -->
-        <button id="trigger-scrape-btn" onclick="triggerScrape()" class="inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition">
-          <svg id="scrape-icon" class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          <span id="scrape-text">Trigger Scrape</span>
-        </button>
       </div>
-
     </div>
   </header>
 
   <!-- Live Market Indices Ticker Bar -->
-  <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2 text-xs overflow-x-auto">
-    <div class="max-w-7xl mx-auto flex items-center space-x-6 whitespace-nowrap" id="indices-container">
-      <span class="text-slate-500 font-medium">Indices:</span>
-      <span class="text-slate-400">Loading benchmark market indices...</span>
+  <div class="bg-slate-900/95 border-b border-slate-800/80 px-3 sm:px-6 py-2 text-xs overflow-hidden select-none">
+    <div class="w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[1920px] tv:max-w-[2400px] mx-auto flex items-center">
+      <div class="flex items-center space-x-1.5 pr-3 text-slate-400 font-semibold tracking-wider text-[11px] uppercase shrink-0 border-r border-slate-800">
+        <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+        <span class="hidden sm:inline">Markets:</span>
+      </div>
+      <div class="overflow-x-auto no-scrollbar flex items-center space-x-5 pl-3 whitespace-nowrap" id="indices-container">
+        <span class="text-slate-400">Loading benchmark market indices...</span>
+      </div>
     </div>
   </div>
 
-  <!-- Notification Banner -->
-  <div id="toast-banner" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
-    <div class="p-3 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs flex items-center justify-between">
-      <span id="toast-message">Cycle completed</span>
-      <button onclick="document.getElementById('toast-banner').classList.add('hidden')" class="text-indigo-400 hover:text-white">&times;</button>
+  <!-- Notification Toast Banner -->
+  <div id="toast-banner" class="hidden w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[1920px] tv:max-w-[2400px] mx-auto px-3 sm:px-6 lg:px-8 mt-3">
+    <div class="p-3 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-indigo-200 text-xs sm:text-sm flex items-center justify-between shadow-lg shadow-indigo-950/50">
+      <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span id="toast-message">Cycle completed</span>
+      </div>
+      <button onclick="document.getElementById('toast-banner').classList.add('hidden')" class="p-1 text-indigo-400 hover:text-white transition">&times;</button>
     </div>
   </div>
 
   <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col space-y-6">
+  <main class="w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[1920px] tv:max-w-[2400px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 flex flex-col space-y-4 sm:space-y-6">
 
-    <!-- KPI Summary Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-        <div class="text-slate-400 text-xs font-medium">Total Stored News</div>
-        <div class="text-2xl font-bold text-white mt-1 mono" id="stat-total">--</div>
-        <div class="text-[11px] text-slate-500 mt-1">Deduplicated in DB</div>
+    <!-- KPI Summary Cards (2-col mobile, 4-col laptop/desktop/TV) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 3xl:gap-6">
+      
+      <!-- Card 1: Total News -->
+      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Total Stored News</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+        </div>
+        <div class="text-xl sm:text-2xl 3xl:text-3xl font-bold text-white mt-1 sm:mt-1.5 mono tv-scale-stat" id="stat-total">--</div>
+        <div class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">Deduplicated in DB</div>
       </div>
-      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-        <div class="text-slate-400 text-xs font-medium">BSE Announcements</div>
-        <div class="text-2xl font-bold text-sky-400 mt-1 mono" id="stat-bse">--</div>
-        <div class="text-[11px] text-slate-500 mt-1">Direct corporate XML feed</div>
+
+      <!-- Card 2: Exchanges -->
+      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Exchange Filings</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+        </div>
+        <div class="text-xl sm:text-2xl 3xl:text-3xl font-bold text-sky-400 mt-1 sm:mt-1.5 mono tv-scale-stat" id="stat-exchange">--</div>
+        <div class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">
+          <span id="stat-bse" class="text-slate-400 font-medium">--</span> BSE &bull; <span id="stat-nse" class="text-slate-400 font-medium">--</span> NSE
+        </div>
       </div>
-      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-        <div class="text-slate-400 text-xs font-medium">NSE Announcements</div>
-        <div class="text-2xl font-bold text-amber-400 mt-1 mono" id="stat-nse">--</div>
-        <div class="text-[11px] text-slate-500 mt-1">Equities JSON API</div>
+
+      <!-- Card 3: Regulators & Policy -->
+      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Govt & Regulators</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+        </div>
+        <div class="text-xl sm:text-2xl 3xl:text-3xl font-bold text-violet-400 mt-1 sm:mt-1.5 mono tv-scale-stat" id="stat-policy">--</div>
+        <div class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">IRDAI, RBI, SEBI, Cabinet</div>
       </div>
-      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
-        <div class="text-slate-400 text-xs font-medium">Active Categories</div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1 mono" id="stat-categories">--</div>
-        <div class="text-[11px] text-slate-500 mt-1">Results, Board, Dividend, etc.</div>
+
+      <!-- Card 4: Global Macro -->
+      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">World & Global Macro</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        </div>
+        <div class="text-xl sm:text-2xl 3xl:text-3xl font-bold text-cyan-400 mt-1 sm:mt-1.5 mono tv-scale-stat" id="stat-world">--</div>
+        <div class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1 truncate">BBC, DW, Fed, Crude, Forex</div>
       </div>
+
     </div>
 
     <!-- Filter & Search Controls -->
-    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div class="bg-slate-900/70 border border-slate-800/80 rounded-xl p-3 sm:p-4 space-y-2.5 sm:space-y-3 tv-card">
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         
         <!-- Search Keyword / Ticker -->
-        <div class="md:col-span-2 relative">
+        <div class="sm:col-span-2 relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
           <input 
             type="text" 
             id="search-input" 
-            placeholder="Search company, ticker (e.g. RELIANCE, TCS) or headline..." 
-            class="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+            placeholder="Search company, ticker (e.g. RELIANCE, TCS) or headline... (Press '/' to focus)" 
+            class="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
             oninput="debounceSearch()"
           />
+          <button 
+            id="clear-search-btn"
+            onclick="clearSearch()"
+            class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white"
+            title="Clear search"
+          >
+            &times;
+          </button>
         </div>
 
         <!-- Source Filter -->
         <div>
-          <select id="source-filter" onchange="fetchNews()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+          <select 
+            id="source-filter" 
+            onchange="fetchNews()" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition cursor-pointer"
+          >
             <option value="">All Sources (Exchange, Policy, World)</option>
             <option value="bse">BSE Disclosures</option>
             <option value="nse">NSE Disclosures</option>
             <option value="irdai">IRDAI (Insurance Circulars)</option>
             <option value="rbi">RBI (Monetary Policy & Circulars)</option>
             <option value="sebi">SEBI (Orders & Regulations)</option>
-            <option value="govt_policy">Govt Policy & Bills (Cabinet, GST, Duties)</option>
-            <option value="world_news">World & Macro (Fed, Crude, Commodities)</option>
-            <option value="media_news">Live Media News (ET / Moneycontrol)</option>
+            <option value="govt_policy">Govt Policy & Bills (Cabinet, GST)</option>
+            <option value="world_news">World & Macro (Fed, Crude)</option>
+            <option value="media_news">Live Media (ET, Moneycontrol)</option>
           </select>
         </div>
 
         <!-- Category Filter -->
         <div>
-          <select id="category-filter" onchange="fetchNews()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+          <select 
+            id="category-filter" 
+            onchange="fetchNews()" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition cursor-pointer"
+          >
             <option value="">All Categories</option>
             <option value="financial_results">Financial Results</option>
             <option value="board_meeting">Board Meeting</option>
@@ -186,29 +370,39 @@
 
       </div>
 
-      <!-- Quick Ticker Filter Pills -->
-      <div class="flex items-center space-x-2 pt-1 text-xs text-slate-400 overflow-x-auto">
-        <span class="text-slate-500">Quick Filters:</span>
-        <button onclick="setTickerFilter('')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">All</button>
-        <button onclick="setSourceFilter('irdai')" class="px-2.5 py-1 rounded bg-violet-950 text-violet-400 border border-violet-800/50 hover:bg-violet-900 transition">IRDAI Policy</button>
-        <button onclick="setSourceFilter('rbi')" class="px-2.5 py-1 rounded bg-blue-950 text-blue-400 border border-blue-800/50 hover:bg-blue-900 transition">RBI Policy</button>
-        <button onclick="setSourceFilter('govt_policy')" class="px-2.5 py-1 rounded bg-fuchsia-950 text-fuchsia-400 border border-fuchsia-800/50 hover:bg-fuchsia-900 transition">Govt Bills</button>
-        <button onclick="setSourceFilter('world_news')" class="px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/50 hover:bg-cyan-900 transition">World & Macro</button>
-        <button onclick="setTickerFilter('RELIANCE')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">RELIANCE</button>
-        <button onclick="setTickerFilter('TCS')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">TCS</button>
-        <button onclick="setCategoryFilter('financial_results')" class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/50 hover:bg-emerald-900 transition">Q3/Q4 Results</button>
-        <button onclick="setCategoryFilter('surveillance_asm_gsm')" class="px-2.5 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800/50 hover:bg-rose-900 transition">ASM/GSM</button>
+      <!-- Quick Ticker Filter Pills (Horizontal swipe with hidden scrollbars) -->
+      <div class="flex items-center space-x-1.5 sm:space-x-2 pt-1 text-[11px] sm:text-xs text-slate-400 overflow-x-auto no-scrollbar whitespace-nowrap py-0.5">
+        <span class="text-slate-500 font-medium shrink-0">Quick Filters:</span>
+        <button onclick="setTickerFilter('')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">All</button>
+        <button onclick="setSourceFilter('irdai')" class="px-2.5 py-1 rounded-md bg-violet-950/80 text-violet-300 border border-violet-800/40 hover:bg-violet-900 transition shrink-0">IRDAI</button>
+        <button onclick="setSourceFilter('rbi')" class="px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800/40 hover:bg-blue-900 transition shrink-0">RBI</button>
+        <button onclick="setSourceFilter('sebi')" class="px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">SEBI</button>
+        <button onclick="setSourceFilter('govt_policy')" class="px-2.5 py-1 rounded-md bg-fuchsia-950/80 text-fuchsia-300 border border-fuchsia-800/40 hover:bg-fuchsia-900 transition shrink-0">Govt Bills</button>
+        <button onclick="setSourceFilter('world_news')" class="px-2.5 py-1 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800/40 hover:bg-cyan-900 transition shrink-0">World Macro</button>
+        <button onclick="setTickerFilter('RELIANCE')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">RELIANCE</button>
+        <button onclick="setTickerFilter('TCS')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">TCS</button>
+        <button onclick="setCategoryFilter('financial_results')" class="px-2.5 py-1 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 hover:bg-emerald-900 transition shrink-0">Q3/Q4 Results</button>
+        <button onclick="setCategoryFilter('surveillance_asm_gsm')" class="px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">ASM/GSM</button>
+        <button onclick="setCategoryFilter('dividend')" class="px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/40 hover:bg-amber-900 transition shrink-0">Dividends</button>
       </div>
+
     </div>
 
-    <!-- Feed Header & Count -->
-    <div class="flex items-center justify-between text-xs text-slate-400">
-      <div>
-        Showing <span id="items-count" class="font-semibold text-slate-200">0</span> announcements
+    <!-- Feed Header & Pagination/Row Controls -->
+    <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div class="flex items-center space-x-2">
+        <span>Showing <span id="items-count" class="font-bold text-slate-200 mono">0</span> announcements</span>
+        <span id="remote-hint" class="hidden xl:inline-block text-[11px] text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+          Remote/Nav: [↑][↓] Navigate &bull; [Enter] Open &bull; [T] TV Mode &bull; [F] Fullscreen
+        </span>
       </div>
       <div class="flex items-center space-x-2">
-        <span>Rows:</span>
-        <select id="limit-select" onchange="fetchNews()" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300">
+        <label for="limit-select" class="text-slate-400">Rows:</label>
+        <select 
+          id="limit-select" 
+          onchange="fetchNews()" 
+          class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-slate-300 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+        >
           <option value="25">25</option>
           <option value="50" selected>50</option>
           <option value="100">100</option>
@@ -218,20 +412,58 @@
     </div>
 
     <!-- Announcements Feed List -->
-    <div id="feed-container" class="space-y-3">
-      <div class="text-center py-12 text-slate-500">Loading disclosures...</div>
+    <div id="feed-container" class="space-y-2.5 sm:space-y-3 pb-8">
+      <div class="text-center py-16 text-slate-500 text-sm">
+        <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        Loading disclosures...
+      </div>
     </div>
 
   </main>
 
+  <!-- Sticky Mobile Action Toolbar (Visible on small screens) -->
+  <div class="sm:hidden sticky bottom-0 z-30 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 p-2.5 flex items-center justify-around text-xs">
+    <button onclick="scrollToTop(); document.getElementById('search-input').focus();" class="flex flex-col items-center text-slate-400 hover:text-white">
+      <svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <span>Search</span>
+    </button>
+    <button onclick="fetchNews()" class="flex flex-col items-center text-slate-400 hover:text-white">
+      <svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      <span>Refresh</span>
+    </button>
+    <button onclick="toggleTvMode()" class="flex flex-col items-center text-slate-400 hover:text-white">
+      <svg class="w-4 h-4 mb-0.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      <span>TV View</span>
+    </button>
+    <button onclick="scrollToTop()" class="flex flex-col items-center text-slate-400 hover:text-white">
+      <svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+      <span>Top</span>
+    </button>
+  </div>
+
   <!-- Footer -->
-  <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-    Indian Stock Market Real-Time News Scraper & Aggregator &bull; FastAPI + PostgreSQL &bull; Open Architecture
+  <footer class="border-t border-slate-800/80 py-4 text-center text-[11px] sm:text-xs text-slate-500 bg-slate-950/80">
+    <div class="w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[1920px] tv:max-w-[2400px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>
+        Indian Stock Market Real-Time Scraper & Aggregator &bull; FastAPI + PostgreSQL
+      </div>
+      <div class="flex items-center space-x-3 text-slate-400">
+        <span class="inline-flex items-center">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+          Terminal Connected
+        </span>
+        <span>&bull;</span>
+        <button onclick="toggleTvMode()" class="hover:text-indigo-400 transition">TV/Wallboard</button>
+      </div>
+    </div>
   </footer>
 
   <script>
     const API_KEY = "{{API_KEY}}";
     let searchTimeout = null;
+    let currentSelectedIndex = -1;
+    let currentFeedItems = [];
+    let isTvMode = false;
 
     function getAuthHeaders() {
       const headers = {};
@@ -241,7 +473,25 @@
       return headers;
     }
 
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function clearSearch() {
+      const input = document.getElementById('search-input');
+      input.value = '';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      fetchNews();
+    }
+
     function debounceSearch() {
+      const input = document.getElementById('search-input');
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (input.value.trim().length > 0) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(fetchNews, 300);
     }
@@ -251,8 +501,73 @@
       menu.classList.toggle('hidden');
     }
 
+    // Close export menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const exportBtn = document.getElementById('export-btn');
+      const menu = document.getElementById('export-menu');
+      if (menu && !menu.classList.contains('hidden') && !exportBtn.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    function toggleTvMode() {
+      isTvMode = !isTvMode;
+      document.body.classList.toggle('tv-mode', isTvMode);
+      const label = document.getElementById('tv-mode-label');
+      if (label) {
+        label.innerText = isTvMode ? 'Standard' : 'TV Mode';
+      }
+      const btn = document.getElementById('tv-mode-btn');
+      if (btn) {
+        if (isTvMode) {
+          btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-500');
+          btn.classList.remove('bg-slate-800/80', 'text-slate-300');
+        } else {
+          btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-500');
+          btn.classList.add('bg-slate-800/80', 'text-slate-300');
+        }
+      }
+      try {
+        localStorage.setItem('news_terminal_tv_mode', isTvMode ? '1' : '0');
+      } catch (e) {}
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn('Error attempting to enable fullscreen:', err.message);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    function updateLiveClock() {
+      const clockEl = document.getElementById('live-clock');
+      if (!clockEl) return;
+      try {
+        const now = new Date();
+        const istStr = now.toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        clockEl.innerText = `${istStr} IST`;
+      } catch (e) {}
+    }
+
     function setTickerFilter(ticker) {
       document.getElementById('search-input').value = ticker;
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (ticker) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
       fetchNews();
     }
 
@@ -268,19 +583,19 @@
 
     function getCategoryBadge(cat) {
       const map = {
-        'financial_results': { bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', label: 'Results' },
-        'board_meeting': { bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30', label: 'Board Meeting' },
-        'dividend': { bg: 'bg-amber-500/10 text-amber-400 border-amber-500/30', label: 'Dividend' },
-        'acquisition_merger': { bg: 'bg-purple-500/10 text-purple-400 border-purple-500/30', label: 'Acquisition' },
-        'surveillance_asm_gsm': { bg: 'bg-rose-500/10 text-rose-400 border-rose-500/30', label: 'ASM / GSM' },
-        'circuit_price_band': { bg: 'bg-orange-500/10 text-orange-400 border-orange-500/30', label: 'Price Band' },
-        'order_contract': { bg: 'bg-teal-500/10 text-teal-400 border-teal-500/30', label: 'Order / Win' },
-        'management_change': { bg: 'bg-blue-500/10 text-blue-400 border-blue-500/30', label: 'Leadership' },
-        'regulatory': { bg: 'bg-slate-500/10 text-slate-300 border-slate-500/30', label: 'Circular' },
-        'general': { bg: 'bg-slate-800 text-slate-400 border-slate-700', label: 'General' },
+        'financial_results': { bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: 'Results' },
+        'board_meeting': { bg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30', label: 'Board Meeting' },
+        'dividend': { bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30', label: 'Dividend' },
+        'acquisition_merger': { bg: 'bg-purple-500/15 text-purple-300 border-purple-500/30', label: 'Acquisition' },
+        'surveillance_asm_gsm': { bg: 'bg-rose-500/15 text-rose-300 border-rose-500/30', label: 'ASM / GSM' },
+        'circuit_price_band': { bg: 'bg-orange-500/15 text-orange-300 border-orange-500/30', label: 'Price Band' },
+        'order_contract': { bg: 'bg-teal-500/15 text-teal-300 border-teal-500/30', label: 'Order / Contract' },
+        'management_change': { bg: 'bg-blue-500/15 text-blue-300 border-blue-500/30', label: 'Leadership' },
+        'regulatory': { bg: 'bg-slate-500/15 text-slate-300 border-slate-500/30', label: 'Circular' },
+        'general': { bg: 'bg-slate-800 text-slate-400 border-slate-700/80', label: 'General' },
       };
       const badge = map[cat] || map['general'];
-      return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${badge.bg}">${badge.label}</span>`;
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-medium border ${badge.bg} tv-badge">${badge.label}</span>`;
     }
 
     function formatTime(isoStr) {
@@ -307,21 +622,25 @@
         const res = await fetch('/stats');
         if (!res.ok) return;
         const data = await res.json();
-        document.getElementById('stat-total').innerText = data.total_news.toLocaleString();
-        document.getElementById('stat-bse').innerText = data.bse_count.toLocaleString();
-        document.getElementById('stat-nse').innerText = data.nse_count.toLocaleString();
-        document.getElementById('stat-categories').innerText = Object.keys(data.categories || {}).length;
+        document.getElementById('stat-total').innerText = (data.total_news || 0).toLocaleString();
+        const bseCount = data.bse_count || 0;
+        const nseCount = data.nse_count || 0;
+        document.getElementById('stat-exchange').innerText = (bseCount + nseCount).toLocaleString();
+        document.getElementById('stat-bse').innerText = bseCount.toLocaleString();
+        document.getElementById('stat-nse').innerText = nseCount.toLocaleString();
+        document.getElementById('stat-policy').innerText = (data.policy_count || 0).toLocaleString();
+        document.getElementById('stat-world').innerText = (data.world_count || 0).toLocaleString();
 
         const pill = document.getElementById('market-status-pill');
         if (data.is_market_hours) {
-          pill.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+          pill.className = "inline-flex items-center px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
           pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span> Market OPEN`;
         } else {
-          pill.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700";
+          pill.className = "inline-flex items-center px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700/80";
           pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Market CLOSED`;
         }
       } catch (e) {
-        console.error(e);
+        console.error('Stats error:', e);
       }
     }
 
@@ -333,22 +652,22 @@
         if (!items || items.length === 0) return;
 
         const container = document.getElementById('indices-container');
-        let html = '<span class="text-slate-500 font-semibold uppercase tracking-wider">Indices:</span>';
+        let html = '';
         items.forEach(it => {
           const isUp = it.percent_change >= 0;
           const colorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
           const sign = isUp ? '+' : '';
           html += `
-            <div class="inline-flex items-center space-x-1.5 border-r border-slate-800 pr-5">
-              <span class="font-medium text-slate-300">${it.name}:</span>
-              <span class="mono font-semibold text-slate-100">${it.last ? it.last.toLocaleString() : '--'}</span>
-              <span class="mono text-[11px] ${colorClass}">(${sign}${it.percent_change}%)</span>
+            <div class="inline-flex items-center space-x-1.5 border-r border-slate-800/80 pr-4 shrink-0">
+              <span class="font-medium text-slate-300 text-xs">${it.name}:</span>
+              <span class="mono font-bold text-slate-100 text-xs">${it.last ? it.last.toLocaleString() : '--'}</span>
+              <span class="mono text-[11px] font-semibold ${colorClass}">(${sign}${it.percent_change}%)</span>
             </div>
           `;
         });
         container.innerHTML = html;
       } catch (e) {
-        console.error(e);
+        console.error('Indices error:', e);
       }
     }
 
@@ -362,80 +681,94 @@
       let url = `/news?limit=${limit}`;
       if (search) {
         url = `/news/search?q=${encodeURIComponent(search)}&limit=${limit}&live_search=true`;
+      } else if (source === 'world_news') {
+        url = `/news/world?limit=${limit}&live_fetch=true`;
+      } else if (source === 'irdai' || source === 'rbi' || source === 'sebi' || source === 'govt_policy') {
+        url = `/news/policy?regulator=${encodeURIComponent(source)}&limit=${limit}&live_fetch=true`;
       }
-      if (source) url += `&source=${encodeURIComponent(source)}`;
+      if (source && !url.includes('/news/world') && !url.includes('/news/policy')) {
+        url += `&source=${encodeURIComponent(source)}`;
+      }
       if (category) url += `&category=${encodeURIComponent(category)}`;
 
       try {
         const res = await fetch(url, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to load news');
         let items = await res.json();
+        currentFeedItems = items;
+        currentSelectedIndex = -1;
 
         document.getElementById('items-count').innerText = items.length;
 
         if (items.length === 0) {
           feed.innerHTML = `
-            <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-8 text-center text-slate-500 text-sm">
-              No news or corporate announcements match your current filter criteria.
+            <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-8 sm:p-12 text-center text-slate-500 text-sm">
+              <svg class="w-10 h-10 mx-auto text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              No corporate disclosures or news found matching your filters.
             </div>
           `;
           return;
         }
 
         let html = '';
-        items.forEach(it => {
+        items.forEach((it, index) => {
           let sourceBadge = '';
           if (it.source === 'bse') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">BSE</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30 tv-badge">BSE</span>';
           } else if (it.source === 'nse') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">NSE</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 tv-badge">NSE</span>';
           } else if (it.source === 'irdai') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/30">IRDAI</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30 tv-badge">IRDAI</span>';
           } else if (it.source === 'rbi') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">RBI</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 tv-badge">RBI</span>';
           } else if (it.source === 'sebi') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">SEBI</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 tv-badge">SEBI</span>';
           } else if (it.source === 'govt_policy') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/30">GOVT POLICY</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30 tv-badge">GOVT POLICY</span>';
           } else if (it.source === 'world_news') {
-            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">WORLD MACRO</span>';
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 tv-badge">WORLD MACRO</span>';
           } else {
-            sourceBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">${it.source || 'MEDIA'}</span>`;
+            sourceBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tv-badge">${it.source || 'MEDIA'}</span>`;
           }
 
           const docLink = it.source_url
-            ? `<a href="${it.source_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 transition">
-                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                 <span>View Link</span>
+            ? `<a href="${it.source_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-500/30 text-xs sm:text-xs text-indigo-300 hover:text-white transition shrink-0">
+                 <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                 <span>Filing Link</span>
                </a>`
             : '';
 
           html += `
-            <div class="bg-slate-900/80 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-4 transition duration-150">
-              <div class="flex items-start justify-between gap-4">
+            <div 
+              id="news-item-${index}" 
+              data-index="${index}" 
+              data-url="${it.source_url || ''}"
+              class="news-card bg-slate-900/75 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 sm:p-4 3xl:p-5 transition-all duration-150 tv-card"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                 
-                <div class="space-y-1.5 flex-1">
+                <div class="space-y-1.5 sm:space-y-2 flex-1 min-w-0">
                   <!-- Header row: Ticker, Source, Category, Timestamp -->
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="setTickerFilter('${it.ticker || ''}')" class="font-bold text-white mono hover:text-indigo-400 transition">
-                      ${it.ticker || 'UNLISTED'}
+                  <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <button onclick="setTickerFilter('${it.ticker || ''}')" class="font-extrabold text-white text-xs sm:text-sm mono hover:text-indigo-400 transition cursor-pointer">
+                      ${it.ticker || 'MACRO'}
                     </button>
                     ${sourceBadge}
                     ${getCategoryBadge(it.category)}
-                    <span class="text-xs text-slate-500 mono">${formatTime(it.published_at)}</span>
+                    <span class="text-[11px] sm:text-xs text-slate-500 mono">${formatTime(it.published_at)}</span>
                   </div>
 
                   <!-- Headline -->
-                  <div class="text-sm font-semibold text-slate-100 leading-snug">
+                  <div class="text-xs sm:text-sm md:text-base font-semibold text-slate-100 leading-snug break-words tv-scale-headline">
                     ${it.title}
                   </div>
 
                   <!-- Description Preview if present -->
-                  ${it.description ? `<p class="text-xs text-slate-400 line-clamp-2">${it.description}</p>` : ''}
+                  ${it.description ? `<p class="text-[11px] sm:text-xs text-slate-400 line-clamp-2 leading-relaxed tv-scale-desc">${it.description}</p>` : ''}
                 </div>
 
-                <!-- Action Button -->
-                <div class="flex items-center space-x-2 shrink-0">
+                <!-- Action Button on right/bottom -->
+                <div class="flex items-center sm:self-start justify-end pt-1 sm:pt-0">
                   ${docLink}
                 </div>
 
@@ -458,7 +791,7 @@
       const toastMsg = document.getElementById('toast-message');
 
       btn.disabled = true;
-      text.innerText = 'Scraping live...';
+      text.innerText = 'Scraping...';
       icon.classList.add('animate-spin');
 
       try {
@@ -490,11 +823,103 @@
       }
     }
 
+    // Keyboard & Remote D-Pad Navigation (Arrow keys, Enter, T, F, /, S, R)
+    document.addEventListener('keydown', (e) => {
+      // Don't intercept if user is typing in an input
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
+        if (e.key === 'Escape') {
+          document.activeElement.blur();
+        }
+        return;
+      }
+
+      if (e.key === '/' || e.key === 's' && e.ctrlKey) {
+        e.preventDefault();
+        const searchInput = document.getElementById('search-input');
+        searchInput.focus();
+        return;
+      }
+
+      if (e.key === 't' || e.key === 'T') {
+        toggleTvMode();
+        return;
+      }
+
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+        return;
+      }
+
+      if (e.key === 'r' || e.key === 'R') {
+        fetchNews();
+        loadStats();
+        loadIndices();
+        return;
+      }
+
+      // Arrow down / j: next announcement
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        selectNewsCard(currentSelectedIndex + 1);
+        return;
+      }
+
+      // Arrow up / k: previous announcement
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        selectNewsCard(currentSelectedIndex - 1);
+        return;
+      }
+
+      // Enter: open currently focused news link
+      if (e.key === 'Enter' && currentSelectedIndex >= 0) {
+        const selectedCard = document.getElementById(`news-item-${currentSelectedIndex}`);
+        if (selectedCard) {
+          const url = selectedCard.getAttribute('data-url');
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        }
+      }
+    });
+
+    function selectNewsCard(newIndex) {
+      if (currentFeedItems.length === 0) return;
+      if (newIndex < 0) newIndex = 0;
+      if (newIndex >= currentFeedItems.length) newIndex = currentFeedItems.length - 1;
+
+      if (currentSelectedIndex >= 0) {
+        const prevCard = document.getElementById(`news-item-${currentSelectedIndex}`);
+        if (prevCard) prevCard.classList.remove('news-card-focused');
+      }
+
+      currentSelectedIndex = newIndex;
+      const targetCard = document.getElementById(`news-item-${currentSelectedIndex}`);
+      if (targetCard) {
+        targetCard.classList.add('news-card-focused');
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
     // Initialize on page load
     window.addEventListener('DOMContentLoaded', () => {
+      // Check saved TV mode preference
+      try {
+        const savedTvMode = localStorage.getItem('news_terminal_tv_mode');
+        // Auto-enable TV mode if saved or if viewport is TV/4K sized (> 2200px)
+        if (savedTvMode === '1' || window.innerWidth >= 2200) {
+          toggleTvMode();
+        }
+      } catch (e) {}
+
       loadStats();
       loadIndices();
       fetchNews();
+      updateLiveClock();
+
+      // Update live clock every second
+      setInterval(updateLiveClock, 1000);
+
       // Auto-refresh stats and indices every 30 seconds
       setInterval(() => {
         loadStats();

@@ -13,7 +13,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from aggregators.news_aggregator import NewsAggregator
 from config import IST_TIMEZONE, is_market_hours, settings
-from database import SessionLocal, init_db, purge_old_descriptions
+from database import SessionLocal, clean_database_duplicates, init_db, purge_old_descriptions
 from utils import logger
 
 
@@ -22,9 +22,11 @@ class NewsSchedulerService:
     Manages periodic news scraping and scheduled database maintenance.
     """
 
-    def __init__(self):
+    def __init__(self, interval_minutes: int = 15, run_initial_scrape: bool = True):
         self.scheduler = BackgroundScheduler(timezone=IST_TIMEZONE)
         self.aggregator = NewsAggregator()
+        self.interval_minutes = interval_minutes
+        self.run_initial_scrape = run_initial_scrape
         self._running = False
 
     def scheduled_scrape_job(self) -> None:
@@ -44,12 +46,13 @@ class NewsSchedulerService:
             db.close()
 
     def scheduled_cleanup_job(self) -> None:
-        """Purges news text bodies older than configured retention days (2:00 AM IST daily)."""
-        logger.info("Executing scheduled retention policy cleanup...")
+        """Purges old descriptions and sweeps duplicate entries."""
+        logger.info("Executing scheduled retention policy & deduplication cleanup...")
         db = SessionLocal()
         try:
             purged = purge_old_descriptions(db, days=settings.body_retention_days)
-            logger.info(f"Retention cleanup finished. Rows cleared: {purged}")
+            cleaned = clean_database_duplicates(db)
+            logger.info(f"Cleanup finished. Descriptions purged: {purged}, Duplicates cleaned: {cleaned}")
         except Exception as e:
             logger.error(f"Error during retention cleanup: {e}")
         finally:
@@ -59,12 +62,12 @@ class NewsSchedulerService:
         """Configures job intervals and starts the background scheduler."""
         init_db()
 
-        # Job 1: Ingestion cycle (every 120s by default)
+        # Job 1: Ingestion cycle (default: every 15 minutes)
         self.scheduler.add_job(
             self.scheduled_scrape_job,
-            trigger=IntervalTrigger(seconds=settings.scrape_interval_market_seconds),
+            trigger=IntervalTrigger(minutes=self.interval_minutes),
             id="market_news_ingestion",
-            name="Market News Ingestion",
+            name=f"News Ingestion (every {self.interval_minutes}m)",
             replace_existing=True,
         )
 
@@ -79,10 +82,11 @@ class NewsSchedulerService:
 
         self.scheduler.start()
         self._running = True
-        logger.info("NewsSchedulerService started successfully.")
+        logger.info(f"NewsSchedulerService started successfully (scrape interval: {self.interval_minutes} minutes).")
 
-        # Run an initial cycle immediately on startup
-        self.scheduled_scrape_job()
+        # Run an initial cycle immediately on startup if requested
+        if self.run_initial_scrape:
+            self.scheduled_scrape_job()
 
     def stop(self) -> None:
         """Gracefully shuts down scheduler."""

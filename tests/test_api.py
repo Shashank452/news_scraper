@@ -118,6 +118,9 @@ def test_ui_and_stats():
     resp_ui = client.get("/ui")
     assert resp_ui.status_code == 200
     assert "Indian Equities News Terminal" in resp_ui.text
+    assert "viewport-fit=cover" in resp_ui.text
+    assert "tv-mode" in resp_ui.text
+    assert "toggleTvMode" in resp_ui.text
 
     # Test stats endpoint
     resp_stats = client.get("/stats")
@@ -150,3 +153,35 @@ def test_policy_and_world_endpoints():
     resp_world = client.get("/news/world?live_fetch=false", headers=headers)
     assert resp_world.status_code == 200
     assert isinstance(resp_world.json(), list)
+
+
+def test_incremental_cursor_and_checkpoint():
+    headers = {"X-API-Key": settings.api_key}
+
+    # 1. Test checkpoint endpoint
+    ckpt_resp = client.get("/news/checkpoint", headers=headers)
+    assert ckpt_resp.status_code == 200
+    ckpt_data = ckpt_resp.json()
+    assert "latest_scraped_at" in ckpt_data
+    assert "last_id" in ckpt_data
+    assert ckpt_data["total_news"] == 2
+
+    # 2. Test incremental endpoint with no cursor (fetches all initial items)
+    inc_resp = client.get("/news/incremental?limit=10", headers=headers)
+    assert inc_resp.status_code == 200
+    inc_data = inc_resp.json()
+    assert inc_data["count"] == 2
+    assert "cursor" in inc_data
+    assert inc_data["cursor"]["since_scraped"] is not None
+    assert inc_data["cursor"]["last_id"] is not None
+
+    # 3. Test resuming from cursor (should return 0 new items because none added)
+    next_cursor = inc_data["cursor"]["since_scraped"]
+    next_id = inc_data["cursor"]["last_id"]
+    resume_resp = client.get(
+        f"/news/incremental?since_scraped={next_cursor}&last_id={next_id}",
+        headers=headers,
+    )
+    assert resume_resp.status_code == 200
+    resume_data = resume_resp.json()
+    assert resume_data["count"] == 0

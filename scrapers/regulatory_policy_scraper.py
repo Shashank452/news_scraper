@@ -118,10 +118,24 @@ class RegulatoryPolicyScraper(BaseScraper):
                 # Extract link and title
                 link_tag = row.find("a")
                 subject = ""
-                for t in cell_texts:
-                    if len(t) > 10 and not t.startswith("0") and not t.startswith("1") and not t.startswith("2"):
-                        subject = t
-                        break
+                if link_tag:
+                    link_txt = clean_text(link_tag.get_text())
+                    if link_txt and len(link_txt) > 5 and link_txt.lower() not in ["view", "download", "click here", "non-archived", "archived"]:
+                        subject = link_txt
+
+                if not subject:
+                    for t in cell_texts:
+                        lower_t = t.lower()
+                        if (
+                            len(t) > 10
+                            and not t.startswith("0")
+                            and not t.startswith("1")
+                            and not t.startswith("2")
+                            and "non-archived" not in lower_t
+                            and "archived" not in lower_t
+                        ):
+                            subject = t
+                            break
 
                 if not subject:
                     continue

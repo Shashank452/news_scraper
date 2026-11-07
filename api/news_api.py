@@ -11,11 +11,11 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Header, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from config import is_market_hours, settings
-from database import NewsItemRecord, get_db, init_db, save_news_items_batch
+from database import NewsItemRecord, get_db, get_latest_checkpoint, init_db, save_news_items_batch
 from exporters.news_exporter import export_to_csv, export_to_json
 from news_model import NewsItemResponse
 from aggregators.news_aggregator import NewsAggregator
@@ -107,6 +107,8 @@ def get_stats(db: Session = Depends(get_db)):
     total = db.query(NewsItemRecord).count()
     bse = db.query(NewsItemRecord).filter(NewsItemRecord.source == "bse").count()
     nse = db.query(NewsItemRecord).filter(NewsItemRecord.source == "nse").count()
+    world = db.query(NewsItemRecord).filter(NewsItemRecord.source == "world_news").count()
+    policy = db.query(NewsItemRecord).filter(NewsItemRecord.source.in_(["irdai", "rbi", "sebi", "govt_policy"])).count()
     categories_raw = (
         db.query(NewsItemRecord.category, func.count(NewsItemRecord.id))
         .group_by(NewsItemRecord.category)
@@ -118,6 +120,8 @@ def get_stats(db: Session = Depends(get_db)):
         "total_news": total,
         "bse_count": bse,
         "nse_count": nse,
+        "world_count": world,
+        "policy_count": policy,
         "categories": categories,
         "is_market_hours": is_market_hours(),
     }
@@ -139,14 +143,23 @@ def get_market_indices():
 )
 def get_news(
     ticker: Optional[str] = Query(None, description="Filter by NSE/BSE ticker symbol (e.g. RELIANCE)"),
-    source: Optional[str] = Query(None, description="Filter by source: 'bse', 'nse'"),
+    source: Optional[str] = Query(None, description="Filter by source: 'bse', 'nse', 'world_news', 'irdai', 'rbi', etc."),
     category: Optional[str] = Query(None, description="Filter by category (e.g. 'financial_results')"),
-    since: Optional[datetime] = Query(None, description="Filter published after this timestamp"),
+    since: Optional[datetime] = Query(None, description="Filter published after this timestamp (published_at)"),
+    since_scraped: Optional[datetime] = Query(None, description="Filter ingested after this timestamp (scraped_at)"),
     limit: int = Query(50, ge=1, le=500, description="Number of items to retrieve"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
 ):
     """Retrieves news announcements with flexible filtering and pagination."""
+    # Auto-fetch if source is world_news and no records exist yet
+    if source and source.lower() == "world_news":
+        world_cnt = db.query(NewsItemRecord).filter(NewsItemRecord.source == "world_news").count()
+        if world_cnt == 0:
+            scraper = MediaNewsScraper()
+            world_items = scraper.fetch_world_and_macro_news(max_items=limit)
+            save_news_items_batch(db, world_items)
+
     stmt = select(NewsItemRecord).order_by(desc(NewsItemRecord.published_at))
 
     if ticker:
@@ -161,10 +174,97 @@ def get_news(
         stmt = stmt.where(NewsItemRecord.category == category.lower())
     if since:
         stmt = stmt.where(NewsItemRecord.published_at >= since)
+    if since_scraped:
+        stmt = stmt.where(NewsItemRecord.scraped_at >= since_scraped)
 
     stmt = stmt.offset(offset).limit(limit)
     records = db.execute(stmt).scalars().all()
     return records
+
+
+@app.get(
+    "/news/incremental",
+    dependencies=[Depends(verify_api_key)],
+    tags=["Streaming & Downstream Integration"],
+)
+def get_incremental_news(
+    since_scraped: Optional[datetime] = Query(
+        None,
+        description="Cursor timestamp: fetch news ingested (scraped_at) strictly after this time",
+    ),
+    last_id: Optional[str] = Query(
+        None,
+        description="Optional UUID tie-breaker when multiple records share the exact same scraped_at",
+    ),
+    ticker: Optional[str] = Query(None, description="Optional ticker filter (e.g. 'RELIANCE')"),
+    source: Optional[str] = Query(None, description="Optional source filter (e.g. 'bse', 'nse')"),
+    category: Optional[str] = Query(None, description="Optional category filter"),
+    limit: int = Query(100, ge=1, le=500, description="Max news items to retrieve per poll"),
+    db: Session = Depends(get_db),
+):
+    """
+    Cursor-based incremental polling endpoint for downstream applications.
+    Allows other apps/services to fetch only new/unseen news from where they left off.
+    Returns items in chronological ingestion order (scraped_at ASC) along with the new cursor.
+    """
+    stmt = select(NewsItemRecord)
+
+    if since_scraped:
+        if last_id:
+            stmt = stmt.where(
+                or_(
+                    NewsItemRecord.scraped_at > since_scraped,
+                    (NewsItemRecord.scraped_at == since_scraped) & (NewsItemRecord.id > last_id),
+                )
+            )
+        else:
+            stmt = stmt.where(NewsItemRecord.scraped_at > since_scraped)
+
+    if ticker:
+        clean_ticker = ticker.strip().upper()
+        stmt = stmt.where(
+            (NewsItemRecord.ticker == clean_ticker)
+            | (NewsItemRecord.title.ilike(f"%{clean_ticker}%"))
+        )
+    if source:
+        stmt = stmt.where(NewsItemRecord.source == source.strip().lower())
+    if category:
+        stmt = stmt.where(NewsItemRecord.category == category.strip().lower())
+
+    stmt = stmt.order_by(asc(NewsItemRecord.scraped_at), asc(NewsItemRecord.id)).limit(limit)
+    records = db.execute(stmt).scalars().all()
+
+    latest_scraped_at = None
+    latest_id = None
+    if records:
+        latest_scraped_at = records[-1].scraped_at.isoformat() if records[-1].scraped_at else None
+        latest_id = str(records[-1].id)
+    elif since_scraped:
+        latest_scraped_at = since_scraped.isoformat()
+        latest_id = last_id
+
+    return {
+        "count": len(records),
+        "has_more": len(records) == limit,
+        "cursor": {
+            "since_scraped": latest_scraped_at,
+            "last_id": latest_id,
+        },
+        "items": [NewsItemResponse.model_validate(r) for r in records],
+    }
+
+
+@app.get(
+    "/news/checkpoint",
+    dependencies=[Depends(verify_api_key)],
+    tags=["Streaming & Downstream Integration"],
+)
+def get_checkpoint(db: Session = Depends(get_db)):
+    """
+    Returns current highest cursor (scraped_at & last_id) and total record count.
+    Use this when bootstrapping a downstream consumer to start listening only to new news.
+    """
+    return get_latest_checkpoint(db)
 
 
 @app.get(

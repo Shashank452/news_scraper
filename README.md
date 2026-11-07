@@ -92,6 +92,7 @@ news_scraper/
 ├── database.py                # SQLAlchemy ORM models and session factories
 ├── news_model.py              # Pydantic schemas and auto-categorization
 ├── utils.py                   # Rate limiting, logger, and ticker sanitization
+├── run.py                     # Master runner (starts server, 15m scheduler, cleanup)
 ├── scheduler.py               # APScheduler background runner
 ├── requirements.txt           # Project dependencies
 ├── .env.example               # Environment variables template
@@ -133,7 +134,26 @@ python scripts/init_db.py
 
 ---
 
-## Running the Components
+## Running the System
+
+### 1. Recommended: Master Unified Runner (`run.py`)
+Run all tasks simultaneously with a single command — starts the API server, schedules scrapers every 15 minutes, stores deduplicated announcements, and schedules daily retention cleanup:
+```powershell
+python run.py
+```
+
+CLI Options:
+```powershell
+python run.py --scrape-interval 15   # Change scrape interval in minutes (default 15)
+python run.py --port 8000            # Specify custom port
+python run.py --cleanup-now          # Execute duplicate sweep and retention purge on start
+python run.py --no-server            # Run scheduler daemon only (worker mode)
+python run.py --no-scheduler         # Run FastAPI REST server only
+```
+
+---
+
+## Running Individual Components
 
 ### 1. Run Scrapers CLI (Ad-Hoc / Test Run)
 Test fetching and deduplicating announcements without starting the background daemon:
@@ -172,11 +192,38 @@ All protected endpoints require the `X-API-Key` header (defined in `.env`).
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/health` | Healthcheck for server & database (no auth required) |
-| `GET` | `/news` | Query news with filters (`ticker`, `source`, `category`, `since`, `limit`, `offset`) |
+| `GET` | `/news` | Query news with filters (`ticker`, `source`, `category`, `since`, `since_scraped`, `limit`, `offset`) |
+| `GET` | `/news/incremental` | **Cursor-based incremental polling**: fetch news ingested strictly after `since_scraped` cursor for downstream applications |
+| `GET` | `/news/checkpoint` | Get latest database watermark (`latest_scraped_at`, `last_id`, `total_news`) for starting sync |
 | `GET` | `/news/{ticker}` | Retrieve latest announcements for a specific ticker (e.g. `/news/RELIANCE`) |
 | `GET` | `/news/sources/{source}` | Retrieve announcements by source (`/news/sources/bse`, `/news/sources/nse`) |
 | `GET` | `/news/export/file` | Download announcements as CSV or JSON (`?format=csv` or `?format=json`) |
 | `POST` | `/news/trigger-scrape` | Trigger an on-demand scraping & deduplication cycle |
+
+### Downstream Application Integration Example (Python)
+Fetch news from where you left off:
+```python
+import requests
+
+API_URL = "http://127.0.0.1:8000"
+HEADERS = {"X-API-Key": "dev_secret_api_key_change_in_production"}
+
+# 1. Get current checkpoint to start from right now (or pass None to fetch all)
+checkpoint = requests.get(f"{API_URL}/news/checkpoint", headers=HEADERS).json()
+cursor_time = checkpoint["latest_scraped_at"]
+cursor_id = checkpoint["last_id"]
+
+# 2. In your worker loop, fetch latest updates from where you left off:
+params = {"since_scraped": cursor_time, "last_id": cursor_id, "limit": 100}
+resp = requests.get(f"{API_URL}/news/incremental", headers=HEADERS, params=params).json()
+
+for item in resp["items"]:
+    print(f"[{item['ticker']}] {item['title']}")
+
+# Update your local cursor with the new watermark returned
+cursor_time = resp["cursor"]["since_scraped"]
+cursor_id = resp["cursor"]["last_id"]
+```
 
 ---
 

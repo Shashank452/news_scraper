@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from database import (
     Base,
     NewsItemRecord,
+    clean_database_duplicates,
     purge_old_descriptions,
     save_news_item,
     save_news_items_batch,
@@ -136,3 +137,68 @@ def test_data_retention_purge(test_db):
 
     assert fresh_record.title == "Fresh HDFC Announcement"
     assert fresh_record.description == "This fresh body text must be kept"
+
+
+def test_url_and_title_deduplication(test_db):
+    now = datetime.now(timezone.utc)
+    item1 = NewsItemCreate(
+        ticker="INFY",
+        title="Infosys Board Meeting",
+        source="bse",
+        source_url="https://bseindia.com/pdf1",
+        source_id="bse_id_100",
+        published_at=now,
+    )
+    save_news_item(test_db, item1)
+
+    # Attempt to insert same URL with different source_id
+    item2 = NewsItemCreate(
+        ticker="INFY",
+        title="Infosys Outcome",
+        source="bse",
+        source_url="https://bseindia.com/pdf1",
+        source_id="bse_id_101",
+        published_at=now + timedelta(minutes=5),
+    )
+    res2 = save_news_item(test_db, item2)
+    assert res2 is None  # Skipped due to identical URL!
+
+    # Attempt to insert identical ticker + title within 24h
+    item3 = NewsItemCreate(
+        ticker="INFY",
+        title="Infosys Board Meeting",
+        source="bse",
+        source_url="https://bseindia.com/pdf2",
+        source_id="bse_id_102",
+        published_at=now + timedelta(minutes=10),
+    )
+    res3 = save_news_item(test_db, item3)
+    assert res3 is None  # Skipped due to duplicate title/ticker within 24h!
+
+    assert test_db.query(NewsItemRecord).count() == 1
+
+
+def test_clean_database_duplicates(test_db):
+    now = datetime.now(timezone.utc)
+    # Manually insert duplicates into table
+    r1 = NewsItemRecord(
+        ticker="TCS",
+        title="TCS Duplicate Announcement",
+        source="bse",
+        source_id="bse_dup_1",
+        published_at=now,
+    )
+    r2 = NewsItemRecord(
+        ticker="TCS",
+        title="TCS Duplicate Announcement",
+        source="bse",
+        source_id="bse_dup_2",
+        published_at=now,
+    )
+    test_db.add_all([r1, r2])
+    test_db.commit()
+
+    assert test_db.query(NewsItemRecord).count() == 2
+    removed = clean_database_duplicates(test_db)
+    assert removed == 1
+    assert test_db.query(NewsItemRecord).count() == 1
