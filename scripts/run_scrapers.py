@@ -14,6 +14,8 @@ from aggregators.news_aggregator import NewsAggregator
 from database import init_db
 from scrapers.bse_scraper import BSEScraper
 from scrapers.nse_scraper import NSEScraper
+from scrapers.media_news_scraper import MediaNewsScraper
+from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from utils import logger
 
 
@@ -21,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run News Scraper CLI")
     parser.add_argument(
         "--source",
-        choices=["all", "bse", "nse"],
+        choices=["all", "bse", "nse", "media", "policy"],
         default="all",
         help="Specify which news source to scrape (default: all)",
     )
@@ -34,6 +36,10 @@ def main():
         scrapers.append(BSEScraper())
     if args.source in ("all", "nse"):
         scrapers.append(NSEScraper())
+    if args.source in ("all", "media"):
+        scrapers.append(MediaNewsScraper())
+    if args.source in ("all", "policy"):
+        scrapers.append(RegulatoryPolicyScraper())
 
     aggregator = NewsAggregator(scrapers=scrapers)
     logger.info(f"Starting scraping cycle for sources: {[s.name for s in scrapers]}")

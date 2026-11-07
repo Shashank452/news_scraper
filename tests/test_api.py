@@ -127,3 +127,26 @@ def test_ui_and_stats():
     assert "bse_count" in data
     assert "nse_count" in data
     assert "is_market_hours" in data
+
+
+def test_search_news_endpoint():
+    headers = {"X-API-Key": settings.api_key}
+    # Test local DB search without live query
+    resp = client.get("/news/search?q=Retail&live_search=false", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) >= 1
+    assert "Reliance" in data[0]["title"]
+
+
+def test_policy_and_world_endpoints():
+    headers = {"X-API-Key": settings.api_key}
+    # Test policy endpoint (without live fetch)
+    resp_pol = client.get("/news/policy?live_fetch=false", headers=headers)
+    assert resp_pol.status_code == 200
+    assert isinstance(resp_pol.json(), list)
+
+    # Test world endpoint (without live fetch)
+    resp_world = client.get("/news/world?live_fetch=false", headers=headers)
+    assert resp_world.status_code == 200
+    assert isinstance(resp_world.json(), list)

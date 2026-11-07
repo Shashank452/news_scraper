@@ -155,9 +155,15 @@
         <!-- Source Filter -->
         <div>
           <select id="source-filter" onchange="fetchNews()" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition">
-            <option value="">All Sources (BSE + NSE)</option>
-            <option value="bse">BSE India only</option>
-            <option value="nse">NSE India only</option>
+            <option value="">All Sources (Exchange, Policy, World)</option>
+            <option value="bse">BSE Disclosures</option>
+            <option value="nse">NSE Disclosures</option>
+            <option value="irdai">IRDAI (Insurance Circulars)</option>
+            <option value="rbi">RBI (Monetary Policy & Circulars)</option>
+            <option value="sebi">SEBI (Orders & Regulations)</option>
+            <option value="govt_policy">Govt Policy & Bills (Cabinet, GST, Duties)</option>
+            <option value="world_news">World & Macro (Fed, Crude, Commodities)</option>
+            <option value="media_news">Live Media News (ET / Moneycontrol)</option>
           </select>
         </div>
 
@@ -184,11 +190,12 @@
       <div class="flex items-center space-x-2 pt-1 text-xs text-slate-400 overflow-x-auto">
         <span class="text-slate-500">Quick Filters:</span>
         <button onclick="setTickerFilter('')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">All</button>
+        <button onclick="setSourceFilter('irdai')" class="px-2.5 py-1 rounded bg-violet-950 text-violet-400 border border-violet-800/50 hover:bg-violet-900 transition">IRDAI Policy</button>
+        <button onclick="setSourceFilter('rbi')" class="px-2.5 py-1 rounded bg-blue-950 text-blue-400 border border-blue-800/50 hover:bg-blue-900 transition">RBI Policy</button>
+        <button onclick="setSourceFilter('govt_policy')" class="px-2.5 py-1 rounded bg-fuchsia-950 text-fuchsia-400 border border-fuchsia-800/50 hover:bg-fuchsia-900 transition">Govt Bills</button>
+        <button onclick="setSourceFilter('world_news')" class="px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/50 hover:bg-cyan-900 transition">World & Macro</button>
         <button onclick="setTickerFilter('RELIANCE')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">RELIANCE</button>
         <button onclick="setTickerFilter('TCS')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">TCS</button>
-        <button onclick="setTickerFilter('INFY')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">INFY</button>
-        <button onclick="setTickerFilter('HDFCBANK')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">HDFCBANK</button>
-        <button onclick="setTickerFilter('POLYPLEX')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">POLYPLEX</button>
         <button onclick="setCategoryFilter('financial_results')" class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/50 hover:bg-emerald-900 transition">Q3/Q4 Results</button>
         <button onclick="setCategoryFilter('surveillance_asm_gsm')" class="px-2.5 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800/50 hover:bg-rose-900 transition">ASM/GSM</button>
       </div>
@@ -251,6 +258,11 @@
 
     function setCategoryFilter(category) {
       document.getElementById('category-filter').value = category;
+      fetchNews();
+    }
+
+    function setSourceFilter(source) {
+      document.getElementById('source-filter').value = source;
       fetchNews();
     }
 
@@ -349,10 +361,7 @@
 
       let url = `/news?limit=${limit}`;
       if (search) {
-        // If single word without spaces, filter by ticker or title
-        if (!search.includes(' ')) {
-          url += `&ticker=${encodeURIComponent(search)}`;
-        }
+        url = `/news/search?q=${encodeURIComponent(search)}&limit=${limit}&live_search=true`;
       }
       if (source) url += `&source=${encodeURIComponent(source)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
@@ -362,21 +371,12 @@
         if (!res.ok) throw new Error('Failed to load news');
         let items = await res.json();
 
-        // Secondary client-side text filtering if search phrase has multiple words
-        if (search && search.includes(' ')) {
-          const query = search.toLowerCase();
-          items = items.filter(it => 
-            (it.title && it.title.toLowerCase().includes(query)) ||
-            (it.description && it.description.toLowerCase().includes(query))
-          );
-        }
-
         document.getElementById('items-count').innerText = items.length;
 
         if (items.length === 0) {
           feed.innerHTML = `
             <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-8 text-center text-slate-500 text-sm">
-              No corporate announcements match your current filter criteria.
+              No news or corporate announcements match your current filter criteria.
             </div>
           `;
           return;
@@ -384,14 +384,29 @@
 
         let html = '';
         items.forEach(it => {
-          const sourceBadge = it.source === 'bse'
-            ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">BSE</span>'
-            : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">NSE</span>';
+          let sourceBadge = '';
+          if (it.source === 'bse') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">BSE</span>';
+          } else if (it.source === 'nse') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">NSE</span>';
+          } else if (it.source === 'irdai') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/30">IRDAI</span>';
+          } else if (it.source === 'rbi') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">RBI</span>';
+          } else if (it.source === 'sebi') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">SEBI</span>';
+          } else if (it.source === 'govt_policy') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/30">GOVT POLICY</span>';
+          } else if (it.source === 'world_news') {
+            sourceBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">WORLD MACRO</span>';
+          } else {
+            sourceBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">${it.source || 'MEDIA'}</span>`;
+          }
 
           const docLink = it.source_url
             ? `<a href="${it.source_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 transition">
                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                 <span>View PDF</span>
+                 <span>View Link</span>
                </a>`
             : '';
 

@@ -11,13 +11,15 @@ from news_model import NewsItemCreate
 from scrapers.base_scraper import BaseScraper
 from scrapers.bse_scraper import BSEScraper
 from scrapers.nse_scraper import NSEScraper
+from scrapers.media_news_scraper import MediaNewsScraper
+from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from utils import logger
 
 
 class NewsAggregator:
     """
-    Coordinates multi-source scraping (BSE, NSE, etc.), collects announcements,
-    and inserts new records into the database while skipping duplicates.
+    Coordinates multi-source scraping (BSE, NSE, Media News, Regulatory Policies),
+    collects announcements, and inserts new records into the database while skipping duplicates.
     """
 
     def __init__(self, scrapers: List[BaseScraper] = None):
@@ -25,6 +27,8 @@ class NewsAggregator:
             self.scrapers: List[BaseScraper] = [
                 BSEScraper(),
                 NSEScraper(),
+                MediaNewsScraper(),
+                RegulatoryPolicyScraper(),
             ]
         else:
             self.scrapers = scrapers

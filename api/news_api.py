@@ -5,21 +5,23 @@ and serving the interactive testing web UI.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Header, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from config import is_market_hours, settings
-from database import NewsItemRecord, get_db, init_db
+from database import NewsItemRecord, get_db, init_db, save_news_items_batch
 from exporters.news_exporter import export_to_csv, export_to_json
 from news_model import NewsItemResponse
 from aggregators.news_aggregator import NewsAggregator
 from scrapers.nse_scraper import NSEScraper
+from scrapers.media_news_scraper import MediaNewsScraper
+from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from utils import logger
 
 
@@ -163,6 +165,141 @@ def get_news(
     stmt = stmt.offset(offset).limit(limit)
     records = db.execute(stmt).scalars().all()
     return records
+
+
+@app.get(
+    "/news/live",
+    response_model=List[NewsItemResponse],
+    dependencies=[Depends(verify_api_key)],
+    tags=["News"],
+)
+def get_live_media_news(
+    limit: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Fetches real-time live market news from major financial media feeds (ET, Moneycontrol) and persists them."""
+    scraper = MediaNewsScraper()
+    items = scraper.fetch_latest(max_items_per_source=limit // 2)
+    save_news_items_batch(db, items)
+
+    stmt = (
+        select(NewsItemRecord)
+        .where(NewsItemRecord.source.in_(["economic_times", "moneycontrol", "media_news"]))
+        .order_by(desc(NewsItemRecord.published_at))
+        .limit(limit)
+    )
+    return db.execute(stmt).scalars().all()
+
+
+@app.get(
+    "/news/search",
+    response_model=List[NewsItemResponse],
+    dependencies=[Depends(verify_api_key)],
+    tags=["News"],
+)
+def search_market_news_api(
+    q: Optional[str] = Query(None, description="Keywords or topic (e.g. 'results', 'defence', 'capex')"),
+    ticker: Optional[str] = Query(None, description="Stock ticker symbol (e.g. 'RELIANCE', 'TATA MOTORS')"),
+    days_back: Optional[int] = Query(None, ge=1, le=365, description="Filter news published within last N days"),
+    live_search: bool = Query(True, description="Query live web feeds if True, or search historical DB only"),
+    limit: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Unified search across live and historical news.
+    Searches both stored database records and live online media feeds,
+    deduplicating and returning chronologically sorted articles.
+    """
+    if live_search and (q or ticker):
+        scraper = MediaNewsScraper()
+        live_items = scraper.search_news(query=q or "", ticker=ticker, days_back=days_back, limit=limit)
+        save_news_items_batch(db, live_items)
+
+    stmt = select(NewsItemRecord).order_by(desc(NewsItemRecord.published_at))
+    if ticker:
+        clean_ticker = ticker.strip().upper()
+        stmt = stmt.where(
+            (NewsItemRecord.ticker == clean_ticker)
+            | (NewsItemRecord.title.ilike(f"%{clean_ticker}%"))
+        )
+    if q:
+        clean_q = q.strip()
+        words = [w for w in clean_q.split() if len(w) > 2]
+        if words:
+            conditions = []
+            for w in words:
+                conditions.append(NewsItemRecord.title.ilike(f"%{w}%"))
+                conditions.append(NewsItemRecord.description.ilike(f"%{w}%"))
+            stmt = stmt.where(or_(*conditions))
+        else:
+            stmt = stmt.where(
+                (NewsItemRecord.title.ilike(f"%{clean_q}%"))
+                | (NewsItemRecord.description.ilike(f"%{clean_q}%"))
+            )
+    if days_back:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+        stmt = stmt.where(NewsItemRecord.published_at >= cutoff)
+
+    stmt = stmt.limit(limit)
+    records = db.execute(stmt).scalars().all()
+    return records
+
+
+@app.get(
+    "/news/policy",
+    response_model=List[NewsItemResponse],
+    dependencies=[Depends(verify_api_key)],
+    tags=["Policy & Regulators"],
+)
+def get_regulatory_policy_news(
+    regulator: Optional[str] = Query(None, description="Filter by regulator: 'irdai', 'rbi', 'sebi', 'govt_policy'"),
+    limit: int = Query(30, ge=1, le=100),
+    live_fetch: bool = Query(True, description="Fetch live regulatory updates on-demand"),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves government announcements, bills, amendments, and regulatory notifications
+    from IRDAI, RBI, SEBI, and Central Ministries with tagged affected stocks.
+    """
+    if live_fetch:
+        scraper = RegulatoryPolicyScraper()
+        items = scraper.fetch_latest()
+        save_news_items_batch(db, items)
+
+    stmt = select(NewsItemRecord).where(
+        NewsItemRecord.source.in_(["irdai", "rbi", "sebi", "govt_policy"])
+    )
+    if regulator:
+        stmt = stmt.where(NewsItemRecord.source == regulator.lower())
+
+    stmt = stmt.order_by(desc(NewsItemRecord.published_at)).limit(limit)
+    return db.execute(stmt).scalars().all()
+
+
+@app.get(
+    "/news/world",
+    response_model=List[NewsItemResponse],
+    dependencies=[Depends(verify_api_key)],
+    tags=["World News"],
+)
+def get_world_and_macro_news(
+    limit: int = Query(30, ge=1, le=100),
+    live_fetch: bool = Query(True, description="Fetch live world business news on-demand"),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves global macroeconomic news, US Federal Reserve decisions,
+    crude oil developments, and world markets affecting Indian equities.
+    """
+    if live_fetch:
+        scraper = MediaNewsScraper()
+        items = scraper.fetch_world_and_macro_news(max_items=limit)
+        save_news_items_batch(db, items)
+
+    stmt = select(NewsItemRecord).where(
+        NewsItemRecord.source == "world_news"
+    ).order_by(desc(NewsItemRecord.published_at)).limit(limit)
+    return db.execute(stmt).scalars().all()
 
 
 @app.get(

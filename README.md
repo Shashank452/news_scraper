@@ -157,6 +157,10 @@ Start the FastAPI server:
 ```powershell
 uvicorn api.news_api:app --host 127.0.0.1 --port 8000 --reload
 ```
+If that command fails try the below one.
+```powershell
+.\.venv\Scripts\uvicorn api.news_api:app --host 127.0.0.1 --port 8000 --reload
+```
 Interactive Swagger documentation is available at: `http://127.0.0.1:8000/docs`
 
 ---

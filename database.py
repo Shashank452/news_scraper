@@ -73,7 +73,7 @@ class NewsItemRecord(Base):
     __tablename__ = "news_items"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    ticker = Column(String(50), nullable=True, index=True)
+    ticker = Column(String(150), nullable=True, index=True)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)  # Subject to 90-day retention purge
     source = Column(String(50), nullable=False, index=True)  # bse, nse, sebi, etc.

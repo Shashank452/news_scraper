@@ -31,7 +31,7 @@ class BaseScraper(ABC):
             {
                 "User-Agent": settings.user_agent,
                 "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Encoding": "gzip, deflate",
             }
         )
         self._last_error: Optional[str] = None

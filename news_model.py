@@ -14,8 +14,8 @@ class NewsItemBase(BaseModel):
 
     ticker: Optional[str] = Field(
         default=None,
-        description="Standardized NSE/BSE ticker symbol (e.g. RELIANCE, TCS)",
-        max_length=50,
+        description="Standardized NSE/BSE ticker symbol or impacted tickers list",
+        max_length=150,
     )
     title: str = Field(
         ...,
