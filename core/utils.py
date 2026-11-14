@@ -8,7 +8,7 @@ import re
 import sys
 import time
 from typing import Optional
-from config import settings
+from core.config import settings
 
 # Setup unified logger
 logger = logging.getLogger("news_scraper")

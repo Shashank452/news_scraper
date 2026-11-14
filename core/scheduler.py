@@ -12,9 +12,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from aggregators.news_aggregator import NewsAggregator
-from config import IST_TIMEZONE, is_market_hours, settings
-from database import SessionLocal, clean_database_duplicates, init_db, purge_old_descriptions
-from utils import logger
+from core.config import IST_TIMEZONE, is_market_hours, settings
+from core.database import SessionLocal, clean_database_duplicates, init_db, purge_old_descriptions
+from core.utils import logger
 
 
 class NewsSchedulerService:

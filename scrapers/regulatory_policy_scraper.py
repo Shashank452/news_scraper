@@ -13,10 +13,10 @@ from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 import requests
 
-from config import settings
-from news_model import NewsItemCreate, categorize_announcement
+from core.config import settings
+from core.news_model import NewsItemCreate, categorize_announcement
 from scrapers.base_scraper import BaseScraper
-from utils import clean_text, logger
+from core.utils import clean_text, logger
 
 IST_TZ = ZoneInfo("Asia/Kolkata")
 

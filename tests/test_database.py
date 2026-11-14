@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from database import (
+from core.database import (
     Base,
     NewsItemRecord,
     clean_database_duplicates,
@@ -15,7 +15,7 @@ from database import (
     save_news_item,
     save_news_items_batch,
 )
-from news_model import NewsItemCreate
+from core.news_model import NewsItemCreate
 
 
 @pytest.fixture

@@ -10,8 +10,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from api.news_api import app
-from config import settings
-from database import Base, NewsItemRecord, get_db
+from core.config import settings
+from core.database import Base, NewsItemRecord, get_db
 
 # Setup test SQLite database using StaticPool to share in-memory state across connections
 test_engine = create_engine(

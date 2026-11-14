@@ -8,8 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from database import Base, NewsItemRecord
-from news_model import NewsItemCreate
+from core.database import Base, NewsItemRecord
+from core.news_model import NewsItemCreate
 
 
 @pytest.fixture

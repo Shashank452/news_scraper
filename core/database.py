@@ -28,9 +28,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.types import TypeDecorator, CHAR
 
-from config import settings
-from news_model import NewsItemCreate
-from utils import logger
+from core.config import settings
+from core.news_model import NewsItemCreate
+from core.utils import logger
 
 
 # Cross-dialect UUID type compatible with both PostgreSQL and SQLite

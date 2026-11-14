@@ -9,8 +9,8 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database import init_db
-from utils import logger
+from core.database import init_db
+from core.utils import logger
 
 
 def main():

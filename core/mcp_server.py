@@ -8,14 +8,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, or_, select
 
-from config import is_market_hours
-from database import NewsItemRecord, SessionLocal, save_news_items_batch
+from core.config import is_market_hours
+from core.database import NewsItemRecord, SessionLocal, save_news_items_batch
 from scrapers.bse_scraper import BSEScraper
 from scrapers.nse_scraper import NSEScraper
 from scrapers.media_news_scraper import MediaNewsScraper
 from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from aggregators.news_aggregator import NewsAggregator
-from utils import logger
+from core.utils import logger
 
 try:
     from mcp.server.mcpserver import MCPServer

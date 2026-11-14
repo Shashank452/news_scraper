@@ -104,16 +104,19 @@ news_scraper/
 │   ├── test_run.py            # Master runner CLI configuration tests
 │   ├── test_scheduler.py      # Background scheduler lifecycle tests
 │   └── test_scrapers.py       # BSE, NSE, Media, Policy scraper tests
+├── core/
+│   ├── __init__.py            # Core package exports
+│   ├── config.py              # Pydantic-based configuration management
+│   ├── database.py            # SQLAlchemy ORM models, indexes & deduplication
+│   ├── mcp_server.py          # Model Context Protocol (MCP) server
+│   ├── news_model.py          # Pydantic schemas and auto-categorization
+│   ├── scheduler.py           # APScheduler background runner
+│   └── utils.py               # Rate limiting, logger, and ticker sanitization
 ├── ui/
 │   └── index.html             # Real-time Bloomberg-style news terminal UI
-├── config.py                  # Pydantic-based configuration management
-├── database.py                # SQLAlchemy ORM models, indexes & deduplication
-├── news_model.py              # Pydantic schemas and auto-categorization
+├── run.py                     # Master runner (only python file in root)
 ├── pytest.ini                 # Pytest configuration & warning suppression
 ├── requirements.txt           # Project dependencies
-├── run.py                     # Master runner (starts server, 15m scheduler, cleanup)
-├── scheduler.py               # APScheduler background runner
-├── utils.py                   # Rate limiting, logger, and ticker sanitization
 ├── .env.example               # Environment variables template
 └── .gitignore                 # Version control exclusions
 ```

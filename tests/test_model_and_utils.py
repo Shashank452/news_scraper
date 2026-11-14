@@ -6,9 +6,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import pytest
 
-from config import is_market_hours
-from news_model import NewsItemCreate, categorize_announcement
-from utils import clean_text, normalize_ticker
+from core.config import is_market_hours
+from core.news_model import NewsItemCreate, categorize_announcement
+from core.utils import clean_text, normalize_ticker
 
 IST_TZ = ZoneInfo("Asia/Kolkata")
 

@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 import requests
 
-from config import settings
-from news_model import NewsItemCreate
-from utils import RateLimiter, logger
+from core.config import settings
+from core.news_model import NewsItemCreate
+from core.utils import RateLimiter, logger
 
 
 class BaseScraper(ABC):

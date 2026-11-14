@@ -6,14 +6,14 @@ and coordinates batch deduplication into the database.
 from typing import Dict, List
 from sqlalchemy.orm import Session
 
-from database import SessionLocal, save_news_items_batch
-from news_model import NewsItemCreate
+from core.database import SessionLocal, save_news_items_batch
+from core.news_model import NewsItemCreate
 from scrapers.base_scraper import BaseScraper
 from scrapers.bse_scraper import BSEScraper
 from scrapers.nse_scraper import NSEScraper
 from scrapers.media_news_scraper import MediaNewsScraper
 from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
-from utils import logger
+from core.utils import logger
 
 
 class NewsAggregator:

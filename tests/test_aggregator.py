@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from aggregators.news_aggregator import NewsAggregator
-from database import NewsItemRecord
-from news_model import NewsItemCreate
+from core.database import NewsItemRecord
+from core.news_model import NewsItemCreate
 from scrapers.base_scraper import BaseScraper
 
 

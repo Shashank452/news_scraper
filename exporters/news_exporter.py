@@ -9,7 +9,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database import NewsItemRecord
+from core.database import NewsItemRecord
 
 
 def get_records_query(

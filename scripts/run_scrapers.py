@@ -11,12 +11,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from aggregators.news_aggregator import NewsAggregator
-from database import init_db
+from core.database import init_db
 from scrapers.bse_scraper import BSEScraper
 from scrapers.nse_scraper import NSEScraper
 from scrapers.media_news_scraper import MediaNewsScraper
 from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
-from utils import logger
+from core.utils import logger
 
 
 def main():

@@ -5,7 +5,7 @@ Unit tests for NewsSchedulerService.
 from unittest.mock import MagicMock, patch
 import pytest
 
-from scheduler import NewsSchedulerService
+from core.scheduler import NewsSchedulerService
 
 
 def test_scheduler_initialization():
@@ -26,8 +26,8 @@ def test_scheduler_scheduled_scrape_job():
 def test_scheduler_scheduled_cleanup_job():
     service = NewsSchedulerService(interval_minutes=15, run_initial_scrape=False)
 
-    with patch("scheduler.purge_old_descriptions", return_value=3) as mock_purge, \
-         patch("scheduler.clean_database_duplicates", return_value=1) as mock_clean:
+    with patch("core.scheduler.purge_old_descriptions", return_value=3) as mock_purge, \
+         patch("core.scheduler.clean_database_duplicates", return_value=1) as mock_clean:
         service.scheduled_cleanup_job()
         assert mock_purge.called
         assert mock_clean.called

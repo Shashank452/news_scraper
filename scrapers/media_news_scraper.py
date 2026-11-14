@@ -12,10 +12,10 @@ import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 import requests
 
-from config import settings
-from news_model import NewsItemCreate, categorize_announcement
+from core.config import settings
+from core.news_model import NewsItemCreate, categorize_announcement
 from scrapers.base_scraper import BaseScraper
-from utils import clean_text, logger, normalize_ticker
+from core.utils import clean_text, logger, normalize_ticker
 
 IST_TZ = ZoneInfo("Asia/Kolkata")
 

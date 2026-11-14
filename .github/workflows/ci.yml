@@ -43,7 +43,7 @@ jobs:
 
       - name: Verify Python syntax and integrity
         run: |
-          python -m py_compile run.py scheduler.py database.py config.py utils.py news_model.py
+          python -m py_compile run.py core/config.py core/database.py core/news_model.py core/scheduler.py core/utils.py core/mcp_server.py
 
       - name: Run test suite with pytest
         run: |

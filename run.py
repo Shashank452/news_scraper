@@ -34,16 +34,16 @@ import time
 
 import uvicorn
 
-from config import settings
-from database import (
+from core.config import settings
+from core.database import (
     SessionLocal,
     clean_database_duplicates,
     get_latest_checkpoint,
     init_db,
     purge_old_descriptions,
 )
-from scheduler import NewsSchedulerService
-from utils import logger
+from core.scheduler import NewsSchedulerService
+from core.utils import logger
 
 
 def parse_arguments() -> argparse.Namespace:
