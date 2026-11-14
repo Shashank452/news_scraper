@@ -65,38 +65,57 @@ The module aggregates, deduplicates, and structures corporate news, storing disc
 
 ```
 news_scraper/
-├── api/
-│   ├── __init__.py
-│   └── news_api.py            # FastAPI endpoints & authentication
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # GitHub Actions CI/CD test runner & merge gate
 ├── aggregators/
 │   ├── __init__.py
 │   └── news_aggregator.py     # Aggregator coordinating scrapers & DB batching
+├── api/
+│   ├── __init__.py
+│   └── news_api.py            # FastAPI endpoints, streaming cursors & web UI
+├── docker/
+│   └── docker-compose.yml     # Production PostgreSQL container
+├── docs/
+│   ├── architecture_plan.md   # Architectural design specification
+│   ├── branch_protection_guide.md # Guide for enforcing tests before merging to main
+│   └── roadmap_notes.md       # Trading vision & feature notes
+├── exporters/
+│   ├── __init__.py
+│   └── news_exporter.py       # JSON & CSV export formatters
 ├── scrapers/
 │   ├── __init__.py
 │   ├── base_scraper.py        # Base scraper class with rate-limiting & sessions
 │   ├── bse_scraper.py         # BSE Corporate Announcements scraper
-│   └── nse_scraper.py         # NSE Corporate Announcements scraper with session warmup
-├── exporters/
-│   ├── __init__.py
-│   └── news_exporter.py       # JSON & CSV export formatters
+│   ├── nse_scraper.py         # NSE Corporate Announcements scraper with session warmup
+│   ├── media_news_scraper.py  # Financial media RSS & search scraper
+│   └── regulatory_policy_scraper.py # IRDAI, RBI, SEBI, and Ministry policy scraper
 ├── scripts/
 │   ├── init_db.py             # Database creation script
-│   └── run_scrapers.py        # CLI tool to test scrapers directly
+│   ├── run_scrapers.py        # CLI tool to test scrapers directly
+│   └── verify_all.py          # Pre-push automated syntax & test suite verifier
 ├── tests/
-│   ├── test_model_and_utils.py # Tests for normalization, categorization & market hours
-│   ├── test_database.py       # Tests for deduplication and 90-day retention purge
-│   └── test_api.py            # Tests for API endpoints and auth
-├── docker/
-│   └── docker-compose.yml     # Production PostgreSQL container
+│   ├── conftest.py            # Reusable test fixtures & mock DB sessions
+│   ├── test_aggregator.py     # Aggregator pipeline & fault tolerance tests
+│   ├── test_api.py            # API endpoints & incremental cursor tests
+│   ├── test_database.py       # Deduplication & 90-day retention purge tests
+│   ├── test_exporter.py       # CSV & JSON export format tests
+│   ├── test_model_and_utils.py # Categorization & validation tests
+│   ├── test_run.py            # Master runner CLI configuration tests
+│   ├── test_scheduler.py      # Background scheduler lifecycle tests
+│   └── test_scrapers.py       # BSE, NSE, Media, Policy scraper tests
+├── ui/
+│   └── index.html             # Real-time Bloomberg-style news terminal UI
 ├── config.py                  # Pydantic-based configuration management
-├── database.py                # SQLAlchemy ORM models and session factories
+├── database.py                # SQLAlchemy ORM models, indexes & deduplication
 ├── news_model.py              # Pydantic schemas and auto-categorization
-├── utils.py                   # Rate limiting, logger, and ticker sanitization
+├── pytest.ini                 # Pytest configuration & warning suppression
+├── requirements.txt           # Project dependencies
 ├── run.py                     # Master runner (starts server, 15m scheduler, cleanup)
 ├── scheduler.py               # APScheduler background runner
-├── requirements.txt           # Project dependencies
+├── utils.py                   # Rate limiting, logger, and ticker sanitization
 ├── .env.example               # Environment variables template
-└── plan.md                    # Detailed architectural plan
+└── .gitignore                 # Version control exclusions
 ```
 
 ---
@@ -227,12 +246,28 @@ cursor_id = resp["cursor"]["last_id"]
 
 ---
 
-## Running Tests
+## Running Tests & CI/CD Verification
 
-Execute test suite with pytest:
+### 1. Run Complete Test Suite
+Execute all 38 unit and integration tests with pytest:
 ```powershell
-pytest -v
+pytest
 ```
+
+### 2. Pre-Push Verification Tool
+Run full syntax compilation, index checks, and test runner before pushing to GitHub:
+```powershell
+python scripts/verify_all.py
+```
+
+### 3. GitHub Actions CI/CD & Merge Protection
+This repository includes a GitHub Actions workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) that automatically runs all test cases across Python 3.10, 3.11, and 3.12 on every push and pull request.
+
+To ensure code is only merged into `main` when all tests pass:
+1. Open GitHub repo > **Settings** > **Branches**.
+2. Add branch protection rule for `main`.
+3. Enable **Require status checks to pass before merging** and select `Merge Protection Gate`.
+4. Detailed setup steps are documented in [docs/branch_protection_guide.md](docs/branch_protection_guide.md).
 
 ---
 
