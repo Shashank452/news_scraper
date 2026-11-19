@@ -23,6 +23,13 @@ from scrapers.nse_scraper import NSEScraper
 from scrapers.media_news_scraper import MediaNewsScraper
 from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from core.utils import logger
+from core.mcp_server import create_mcp_sse_app
+from core.market_web_tools import (
+    browse_web_page,
+    fetch_google_news,
+    get_live_market_quote,
+    search_web_free,
+)
 
 
 @asynccontextmanager
@@ -47,6 +54,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Model Context Protocol (MCP) Server-Sent Events (SSE) router for Claude & AI agents
+app.mount("/mcp", create_mcp_sse_app())
 
 UI_HTML_PATH = Path(__file__).parent.parent / "ui" / "index.html"
 
@@ -169,7 +179,24 @@ def get_news(
             | (NewsItemRecord.title.ilike(f"%{ticker}%"))
         )
     if source:
-        stmt = stmt.where(NewsItemRecord.source == source.lower())
+        src_lower = source.strip().lower()
+        if src_lower == "screener":
+            stmt = stmt.where(
+                NewsItemRecord.ticker.isnot(None),
+                NewsItemRecord.ticker != "",
+                NewsItemRecord.ticker != "MACRO",
+            )
+        elif src_lower in ("exchange", "exchanges", "bse,nse", "nse,bse"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["bse", "nse"]))
+        elif src_lower in ("policy", "regulator", "regulators", "govt_policy", "regulatory_policy"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["irdai", "rbi", "sebi", "govt_policy"]))
+        elif src_lower in ("world", "macro", "world_macro", "world_news"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["world_news", "media_news", "economic_times", "moneycontrol"]))
+        elif "," in src_lower:
+            sources_list = [s.strip() for s in src_lower.split(",") if s.strip()]
+            stmt = stmt.where(NewsItemRecord.source.in_(sources_list))
+        else:
+            stmt = stmt.where(NewsItemRecord.source == src_lower)
     if category:
         stmt = stmt.where(NewsItemRecord.category == category.lower())
     if since:
@@ -227,7 +254,24 @@ def get_incremental_news(
             | (NewsItemRecord.title.ilike(f"%{clean_ticker}%"))
         )
     if source:
-        stmt = stmt.where(NewsItemRecord.source == source.strip().lower())
+        src_lower = source.strip().lower()
+        if src_lower == "screener":
+            stmt = stmt.where(
+                NewsItemRecord.ticker.isnot(None),
+                NewsItemRecord.ticker != "",
+                NewsItemRecord.ticker != "MACRO",
+            )
+        elif src_lower in ("exchange", "exchanges", "bse,nse", "nse,bse"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["bse", "nse"]))
+        elif src_lower in ("policy", "regulator", "regulators", "govt_policy", "regulatory_policy"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["irdai", "rbi", "sebi", "govt_policy"]))
+        elif src_lower in ("world", "macro", "world_macro", "world_news"):
+            stmt = stmt.where(NewsItemRecord.source.in_(["world_news", "media_news", "economic_times", "moneycontrol"]))
+        elif "," in src_lower:
+            sources_list = [s.strip() for s in src_lower.split(",") if s.strip()]
+            stmt = stmt.where(NewsItemRecord.source.in_(sources_list))
+        else:
+            stmt = stmt.where(NewsItemRecord.source == src_lower)
     if category:
         stmt = stmt.where(NewsItemRecord.category == category.strip().lower())
 
@@ -403,6 +447,46 @@ def get_world_and_macro_news(
 
 
 @app.get(
+    "/news/google",
+    dependencies=[Depends(verify_api_key)],
+    tags=["Google & Web"],
+)
+def get_google_news_endpoint(
+    query: Optional[str] = Query(None, description="Search keyword or ticker (e.g. 'RELIANCE', 'TCS dividend')"),
+    topic: str = Query("BUSINESS", description="Google News topic (e.g. 'BUSINESS', 'TECHNOLOGY')"),
+    limit: int = Query(15, ge=1, le=30, description="Max news articles to fetch"),
+):
+    """Fetches real-time market and corporate headlines via Google News RSS (free, no API key)."""
+    return fetch_google_news(query=query, topic=topic, limit=limit)
+
+
+@app.get(
+    "/news/browse",
+    dependencies=[Depends(verify_api_key)],
+    tags=["Google & Web"],
+)
+def browse_web_endpoint(
+    url: str = Query(..., description="Target webpage URL to read and parse"),
+    max_chars: int = Query(4000, ge=500, le=20000, description="Max text/markdown characters to return"),
+):
+    """Browses any webpage URL and returns clean LLM-friendly markdown content."""
+    return browse_web_page(url=url, max_chars=max_chars)
+
+
+@app.get(
+    "/news/search-web",
+    dependencies=[Depends(verify_api_key)],
+    tags=["Google & Web"],
+)
+def search_web_endpoint(
+    q: str = Query(..., description="Search keywords"),
+    limit: int = Query(10, ge=1, le=15, description="Number of search results"),
+):
+    """Searches the live web for breaking news, filings, or articles without an API key."""
+    return search_web_free(query=q, limit=limit)
+
+
+@app.get(
     "/news/{ticker}",
     response_model=List[NewsItemResponse],
     dependencies=[Depends(verify_api_key)],
@@ -490,3 +574,16 @@ def trigger_scrape(db: Session = Depends(get_db)):
     aggregator = NewsAggregator()
     summary = aggregator.run_cycle(db=db)
     return {"message": "Scrape cycle completed", "summary": summary}
+
+
+@app.get(
+    "/market/quote/{ticker}",
+    tags=["Market"],
+)
+def get_quote_endpoint(
+    ticker: str,
+    exchange: str = Query("NSE", description="Exchange: 'NSE' (default), 'BSE', or 'GLOBAL'"),
+    range: str = Query("1d", description="Range period: '1d', '5d', '1mo', '1y'"),
+):
+    """Fetches real-time price, day change, 52-week range, and volume for a ticker or index."""
+    return get_live_market_quote(ticker=ticker, exchange=exchange, range_period=range)

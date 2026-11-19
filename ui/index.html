@@ -258,7 +258,12 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 3xl:gap-6">
       
       <!-- Card 1: Total News -->
-      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+      <div 
+        id="kpi-card-all"
+        onclick="filterByCard('all')"
+        title="Click to view all stored news"
+        class="kpi-card cursor-pointer bg-slate-900/70 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-500 rounded-xl p-3 sm:p-4 3xl:p-5 transition-all shadow-sm active:scale-[0.98] tv-card"
+      >
         <div class="flex items-center justify-between">
           <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Total Stored News</span>
           <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
@@ -268,7 +273,12 @@
       </div>
 
       <!-- Card 2: Exchanges -->
-      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+      <div 
+        id="kpi-card-exchange"
+        onclick="filterByCard('exchange')"
+        title="Click to filter Exchange Filings (BSE & NSE)"
+        class="kpi-card cursor-pointer bg-slate-900/70 hover:bg-slate-900 border border-slate-800/80 hover:border-sky-500/70 rounded-xl p-3 sm:p-4 3xl:p-5 transition-all shadow-sm active:scale-[0.98] tv-card"
+      >
         <div class="flex items-center justify-between">
           <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Exchange Filings</span>
           <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
@@ -280,7 +290,12 @@
       </div>
 
       <!-- Card 3: Regulators & Policy -->
-      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+      <div 
+        id="kpi-card-policy"
+        onclick="filterByCard('policy')"
+        title="Click to filter Govt & Regulators news"
+        class="kpi-card cursor-pointer bg-slate-900/70 hover:bg-slate-900 border border-slate-800/80 hover:border-violet-500/70 rounded-xl p-3 sm:p-4 3xl:p-5 transition-all shadow-sm active:scale-[0.98] tv-card"
+      >
         <div class="flex items-center justify-between">
           <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">Govt & Regulators</span>
           <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
@@ -290,7 +305,12 @@
       </div>
 
       <!-- Card 4: Global Macro -->
-      <div class="bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 3xl:p-5 transition shadow-sm tv-card">
+      <div 
+        id="kpi-card-world_macro"
+        onclick="filterByCard('world_macro')"
+        title="Click to filter World & Global Macro news"
+        class="kpi-card cursor-pointer bg-slate-900/70 hover:bg-slate-900 border border-slate-800/80 hover:border-cyan-500/70 rounded-xl p-3 sm:p-4 3xl:p-5 transition-all shadow-sm active:scale-[0.98] tv-card"
+      >
         <div class="flex items-center justify-between">
           <span class="text-slate-400 text-[11px] sm:text-xs font-medium truncate">World & Global Macro</span>
           <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
@@ -314,7 +334,7 @@
           <input 
             type="text" 
             id="search-input" 
-            placeholder="Search company, ticker (e.g. RELIANCE, TCS) or headline... (Press '/' to focus)" 
+            placeholder="Search company, ticker (e.g. INFY, HDFCBANK) or headline... (Press '/' to focus)" 
             class="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
             oninput="debounceSearch()"
           />
@@ -332,17 +352,21 @@
         <div>
           <select 
             id="source-filter" 
-            onchange="fetchNews()" 
+            onchange="onSourceDropdownChange()" 
             class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition cursor-pointer"
           >
             <option value="">All Sources (Exchange, Policy, World)</option>
+            <option value="exchange">Exchange Filings (BSE & NSE)</option>
+            <option value="screener">Screener (Corporate Ticker Filings)</option>
             <option value="bse">BSE Disclosures</option>
             <option value="nse">NSE Disclosures</option>
+            <option value="policy">Govt & Regulators (All)</option>
             <option value="irdai">IRDAI (Insurance Circulars)</option>
             <option value="rbi">RBI (Monetary Policy & Circulars)</option>
             <option value="sebi">SEBI (Orders & Regulations)</option>
             <option value="govt_policy">Govt Policy & Bills (Cabinet, GST)</option>
-            <option value="world_news">World & Macro (Fed, Crude)</option>
+            <option value="world_macro">World & Global Macro (All)</option>
+            <option value="world_news">World News (BBC, DW, Reuters)</option>
             <option value="media_news">Live Media (ET, Moneycontrol)</option>
           </select>
         </div>
@@ -355,7 +379,7 @@
             class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-lg text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition cursor-pointer"
           >
             <option value="">All Categories</option>
-            <option value="financial_results">Financial Results</option>
+            <option value="financial_results">Results</option>
             <option value="board_meeting">Board Meeting</option>
             <option value="dividend">Dividends</option>
             <option value="acquisition_merger">Acquisitions & Mergers</option>
@@ -373,17 +397,17 @@
       <!-- Quick Ticker Filter Pills (Horizontal swipe with hidden scrollbars) -->
       <div class="flex items-center space-x-1.5 sm:space-x-2 pt-1 text-[11px] sm:text-xs text-slate-400 overflow-x-auto no-scrollbar whitespace-nowrap py-0.5">
         <span class="text-slate-500 font-medium shrink-0">Quick Filters:</span>
-        <button onclick="setTickerFilter('')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">All</button>
-        <button onclick="setSourceFilter('irdai')" class="px-2.5 py-1 rounded-md bg-violet-950/80 text-violet-300 border border-violet-800/40 hover:bg-violet-900 transition shrink-0">IRDAI</button>
-        <button onclick="setSourceFilter('rbi')" class="px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800/40 hover:bg-blue-900 transition shrink-0">RBI</button>
-        <button onclick="setSourceFilter('sebi')" class="px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">SEBI</button>
-        <button onclick="setSourceFilter('govt_policy')" class="px-2.5 py-1 rounded-md bg-fuchsia-950/80 text-fuchsia-300 border border-fuchsia-800/40 hover:bg-fuchsia-900 transition shrink-0">Govt Bills</button>
-        <button onclick="setSourceFilter('world_news')" class="px-2.5 py-1 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800/40 hover:bg-cyan-900 transition shrink-0">World Macro</button>
-        <button onclick="setTickerFilter('RELIANCE')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">RELIANCE</button>
-        <button onclick="setTickerFilter('TCS')" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0">TCS</button>
-        <button onclick="setCategoryFilter('financial_results')" class="px-2.5 py-1 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 hover:bg-emerald-900 transition shrink-0">Q3/Q4 Results</button>
-        <button onclick="setCategoryFilter('surveillance_asm_gsm')" class="px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">ASM/GSM</button>
-        <button onclick="setCategoryFilter('dividend')" class="px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/40 hover:bg-amber-900 transition shrink-0">Dividends</button>
+        <button id="pill-all" onclick="resetAllFilters()" class="quick-pill px-2.5 py-1 rounded-md bg-indigo-600 text-white font-semibold shadow-sm transition shrink-0">All</button>
+        <button id="pill-nse" onclick="setSourceFilter('nse')" class="quick-pill px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/40 hover:bg-amber-900 transition shrink-0">NSE</button>
+        <button id="pill-screener" onclick="applyScreenerFilter()" class="quick-pill px-2.5 py-1 rounded-md bg-teal-950/80 text-teal-300 border border-teal-800/40 hover:bg-teal-900 transition shrink-0">Screener</button>
+        <button id="pill-results" onclick="setCategoryFilter('financial_results')" class="quick-pill px-2.5 py-1 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 hover:bg-emerald-900 transition shrink-0">Results</button>
+        <button id="pill-irdai" onclick="setSourceFilter('irdai')" class="quick-pill px-2.5 py-1 rounded-md bg-violet-950/80 text-violet-300 border border-violet-800/40 hover:bg-violet-900 transition shrink-0">IRDAI</button>
+        <button id="pill-rbi" onclick="setSourceFilter('rbi')" class="quick-pill px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800/40 hover:bg-blue-900 transition shrink-0">RBI</button>
+        <button id="pill-sebi" onclick="setSourceFilter('sebi')" class="quick-pill px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">SEBI</button>
+        <button id="pill-govt_policy" onclick="setSourceFilter('govt_policy')" class="quick-pill px-2.5 py-1 rounded-md bg-fuchsia-950/80 text-fuchsia-300 border border-fuchsia-800/40 hover:bg-fuchsia-900 transition shrink-0">Govt Bills</button>
+        <button id="pill-world_news" onclick="setSourceFilter('world_news')" class="quick-pill px-2.5 py-1 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800/40 hover:bg-cyan-900 transition shrink-0">World Macro</button>
+        <button id="pill-surveillance_asm_gsm" onclick="setCategoryFilter('surveillance_asm_gsm')" class="quick-pill px-2.5 py-1 rounded-md bg-rose-950/80 text-rose-300 border border-rose-800/40 hover:bg-rose-900 transition shrink-0">ASM/GSM</button>
+        <button id="pill-dividend" onclick="setCategoryFilter('dividend')" class="quick-pill px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/40 hover:bg-amber-900 transition shrink-0">Dividends</button>
       </div>
 
     </div>
@@ -560,7 +584,110 @@
       } catch (e) {}
     }
 
+    let activeCardFilter = 'all';
+
+    function filterByCard(cardType) {
+      if (cardType === 'all') {
+        resetAllFilters();
+        return;
+      }
+
+      if (activeCardFilter === cardType) {
+        resetAllFilters();
+        return;
+      }
+
+      activeCardFilter = cardType;
+      updateCardHighlight();
+
+      document.getElementById('search-input').value = '';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      document.getElementById('category-filter').value = '';
+      document.getElementById('source-filter').value = cardType;
+
+      updatePillHighlight(cardType === 'exchange' ? 'nse' : cardType === 'policy' ? 'govt_policy' : 'world_news');
+      fetchNews();
+    }
+
+    function updateCardHighlight() {
+      const cardMap = {
+        'all': { id: 'kpi-card-all', ring: ['ring-2', 'ring-slate-400', 'bg-slate-900'] },
+        'exchange': { id: 'kpi-card-exchange', ring: ['ring-2', 'ring-sky-500', 'bg-sky-950/40'] },
+        'policy': { id: 'kpi-card-policy', ring: ['ring-2', 'ring-violet-500', 'bg-violet-950/40'] },
+        'world_macro': { id: 'kpi-card-world_macro', ring: ['ring-2', 'ring-cyan-500', 'bg-cyan-950/40'] },
+      };
+
+      Object.entries(cardMap).forEach(([key, conf]) => {
+        const el = document.getElementById(conf.id);
+        if (!el) return;
+        conf.ring.forEach(cls => el.classList.remove(cls));
+        if (key === activeCardFilter) {
+          conf.ring.forEach(cls => el.classList.add(cls));
+        }
+      });
+    }
+
+    function resetAllFilters() {
+      activeCardFilter = 'all';
+      updateCardHighlight();
+      document.getElementById('search-input').value = '';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      document.getElementById('source-filter').value = '';
+      document.getElementById('category-filter').value = '';
+      updatePillHighlight('all');
+      fetchNews();
+    }
+
+    function onSourceDropdownChange() {
+      const val = document.getElementById('source-filter').value;
+      if (val === 'exchange' || val === 'policy' || val === 'world_macro') {
+        activeCardFilter = val;
+      } else if (val === '') {
+        activeCardFilter = 'all';
+      } else {
+        activeCardFilter = null;
+      }
+      updateCardHighlight();
+      updatePillHighlight(val);
+      fetchNews();
+    }
+
+    function setSourceFilter(source) {
+      activeCardFilter = (source === 'exchange' || source === 'policy' || source === 'world_macro') ? source : null;
+      updateCardHighlight();
+      document.getElementById('source-filter').value = source;
+      updatePillHighlight(source);
+      fetchNews();
+    }
+
+    function setCategoryFilter(category) {
+      document.getElementById('category-filter').value = category;
+      updatePillHighlight(category === 'financial_results' ? 'results' : category);
+      fetchNews();
+    }
+
+    function applyScreenerFilter() {
+      activeCardFilter = null;
+      updateCardHighlight();
+      document.getElementById('source-filter').value = 'screener';
+      updatePillHighlight('screener');
+      fetchNews();
+    }
+
+    function updatePillHighlight(activeId) {
+      const pills = document.querySelectorAll('.quick-pill');
+      pills.forEach(p => {
+        p.classList.remove('bg-indigo-600', 'text-white', 'font-semibold', 'shadow-sm');
+      });
+      const activePill = document.getElementById(`pill-${activeId}`);
+      if (activePill) {
+        activePill.classList.add('bg-indigo-600', 'text-white', 'font-semibold', 'shadow-sm');
+      }
+    }
+
     function setTickerFilter(ticker) {
+      activeCardFilter = null;
+      updateCardHighlight();
       document.getElementById('search-input').value = ticker;
       const clearBtn = document.getElementById('clear-search-btn');
       if (ticker) {
@@ -568,16 +695,7 @@
       } else {
         clearBtn.classList.add('hidden');
       }
-      fetchNews();
-    }
-
-    function setCategoryFilter(category) {
-      document.getElementById('category-filter').value = category;
-      fetchNews();
-    }
-
-    function setSourceFilter(source) {
-      document.getElementById('source-filter').value = source;
+      updatePillHighlight('');
       fetchNews();
     }
 
@@ -731,6 +849,13 @@
             sourceBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tv-badge">${it.source || 'MEDIA'}</span>`;
           }
 
+          const screenerLink = (it.ticker && it.ticker !== 'MACRO')
+            ? `<a href="https://www.screener.in/company/${encodeURIComponent(it.ticker)}/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-teal-950/40 hover:bg-teal-900/60 border border-teal-500/30 text-xs text-teal-300 hover:text-white transition shrink-0 mr-1.5" title="Open ${it.ticker} fundamentals on Screener.in">
+                 <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                 <span>Screener</span>
+               </a>`
+            : '';
+
           const docLink = it.source_url
             ? `<a href="${it.source_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-500/30 text-xs sm:text-xs text-indigo-300 hover:text-white transition shrink-0">
                  <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
@@ -769,6 +894,7 @@
 
                 <!-- Action Button on right/bottom -->
                 <div class="flex items-center sm:self-start justify-end pt-1 sm:pt-0">
+                  ${screenerLink}
                   ${docLink}
                 </div>
 

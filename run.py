@@ -31,6 +31,11 @@ import os
 import signal
 import sys
 import time
+try:
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3
+except ImportError:
+    pass
 
 import uvicorn
 
@@ -115,6 +120,7 @@ def print_banner(args: argparse.Namespace) -> None:
   Retention Purge : Description bodies older than {settings.body_retention_days} days
   UI Dashboard    : http://{args.host}:{args.port}/
   API Docs        : http://{args.host}:{args.port}/docs
+  MCP Server (SSE): http://{args.host}:{args.port}/mcp/sse
   Incremental API : http://{args.host}:{args.port}/news/incremental
   Checkpoint API  : http://{args.host}:{args.port}/news/checkpoint
 ================================================================================

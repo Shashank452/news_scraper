@@ -15,6 +15,12 @@ from scrapers.nse_scraper import NSEScraper
 from scrapers.media_news_scraper import MediaNewsScraper
 from scrapers.regulatory_policy_scraper import RegulatoryPolicyScraper
 from aggregators.news_aggregator import NewsAggregator
+from core.market_web_tools import (
+    browse_web_page as _browse_web_page,
+    fetch_google_news as _fetch_google_news,
+    get_live_market_quote as _get_live_market_quote,
+    search_web_free as _search_web_free,
+)
 from core.utils import logger
 
 try:
@@ -289,6 +295,105 @@ def trigger_live_scrape() -> Dict[str, Any]:
     }
 
 
+@mcp.tool()
+def get_google_news(
+    query: Optional[str] = None,
+    topic: str = "BUSINESS",
+    limit: int = 15,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch real-time stock, sector, and financial news via Google News RSS (100% free, real-time).
+
+    Args:
+        query: Optional search keyword or stock symbol (e.g. 'RELIANCE', 'TCS bonus share', 'RBI repo rate').
+        topic: Topic section when query is omitted (default 'BUSINESS', e.g. 'TECHNOLOGY').
+        limit: Maximum number of articles to return (1-30, default 15).
+    """
+    return _fetch_google_news(query=query, topic=topic, limit=limit)
+
+
+@mcp.tool()
+def browse_web_page(url: str, max_chars: int = 4000) -> Dict[str, Any]:
+    """
+    Browse and extract clean, LLM-ready markdown content from any web article or announcement URL.
+    Uses free Jina Reader (https://r.jina.ai/) with HTML parser fallback.
+
+    Args:
+        url: Full webpage URL to read (e.g. 'https://www.moneycontrol.com/...').
+        max_chars: Maximum character limit for returned content (default 4000).
+    """
+    return _browse_web_page(url=url, max_chars=max_chars)
+
+
+@mcp.tool()
+def search_web_free(query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Search the live web for breaking news, disclosures, analyst reports, or websites without an API key.
+
+    Args:
+        query: Keywords or question to search the web for.
+        limit: Maximum number of search results (1-15, default 10).
+    """
+    return _search_web_free(query=query, limit=limit)
+
+
+@mcp.tool()
+def get_live_market_quote(
+    ticker: str,
+    exchange: str = "NSE",
+    range_period: str = "1d",
+) -> Dict[str, Any]:
+    """
+    Fetch live market prices, day change, 52-week high/low, volume, and currency for any Indian or global stock/index.
+
+    Args:
+        ticker: Stock symbol (e.g. 'RELIANCE', 'TCS', 'HDFCBANK', or indices like '^NSEI' for NIFTY 50, '^BSESN' for SENSEX).
+        exchange: 'NSE' (default, appends .NS), 'BSE' (appends .BO), or 'GLOBAL' / 'US'.
+        range_period: Historical range window ('1d', '5d', '1mo', '1y').
+    """
+    return _get_live_market_quote(ticker=ticker, exchange=exchange, range_period=range_period)
+
+
+def create_mcp_sse_app():
+    """
+    Returns an SSE Starlette application instance configured for remote clients
+    (Claude Web, Claude Desktop, Cursor, etc.). Disables DNS rebinding host checking
+    so public domain names (e.g. clawtrade.duckdns.org or custom cloud IPs) connect cleanly.
+    """
+    try:
+        from mcp.server.transport_security import TransportSecuritySettings
+        security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+        return mcp.sse_app(transport_security=security)
+    except Exception:
+        return mcp.sse_app()
+
+
 if __name__ == "__main__":
-    logger.info("Starting Indian Stock Market MCP Server (stdio transport)...")
-    mcp.run(transport="stdio")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Indian Stock Market MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse"],
+        default="stdio",
+        help="MCP transport protocol (default: stdio)",
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host address to bind for SSE transport (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8001,
+        help="Port number to bind for SSE transport (default: 8001)",
+    )
+    args = parser.parse_args()
+
+    if args.transport == "sse":
+        logger.info(f"Starting Indian Stock Market MCP Server (SSE transport on http://{args.host}:{args.port}/sse)...")
+        mcp.run(transport="sse")
+    else:
+        logger.info("Starting Indian Stock Market MCP Server (stdio transport)...")
+        mcp.run(transport="stdio")

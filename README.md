@@ -214,7 +214,12 @@ All protected endpoints require the `X-API-Key` header (defined in `.env`).
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/health` | Healthcheck for server & database (no auth required) |
+| `GET` | `/mcp/sse` | **Model Context Protocol (MCP) SSE endpoint** for Claude, Cursor, and AI agents |
 | `GET` | `/news` | Query news with filters (`ticker`, `source`, `category`, `since`, `since_scraped`, `limit`, `offset`) |
+| `GET` | `/news/google` | **Google News RSS**: Real-time ticker/query financial headlines without API key |
+| `GET` | `/news/browse` | **Web Page Reader**: Clean markdown conversion of any URL via Jina Reader |
+| `GET` | `/news/search-web` | **Free Web Search**: Live search queries without an API key |
+| `GET` | `/market/quote/{ticker}` | **Live Stock Quote**: Real-time price, day change, 52-week high/low, and volume |
 | `GET` | `/news/incremental` | **Cursor-based incremental polling**: fetch news ingested strictly after `since_scraped` cursor for downstream applications |
 | `GET` | `/news/checkpoint` | Get latest database watermark (`latest_scraped_at`, `last_id`, `total_news`) for starting sync |
 | `GET` | `/news/{ticker}` | Retrieve latest announcements for a specific ticker (e.g. `/news/RELIANCE`) |
@@ -249,10 +254,88 @@ cursor_id = resp["cursor"]["last_id"]
 
 ---
 
+## Model Context Protocol (MCP) Server for Claude & AI Agents
+
+The service embeds an **MCP Server** (`indian-stock-market-news`) allowing AI assistants like **Claude (Web & Desktop)**, Cursor, and custom agentic workflows to query real-time Indian stock market disclosures directly.
+
+### Available MCP Tools (11 Tools):
+1. `get_latest_announcements(ticker, source, category, limit)`: Fetch official corporate disclosures and exchange announcements (BSE & NSE).
+2. `search_market_news(query, ticker, days_back, live_search, limit)`: Search live web feeds and historical database records for keywords or themes.
+3. `get_live_market_indices()`: Live levels for benchmark indices (NIFTY 50, BANK NIFTY, INDIA VIX, NIFTY IT).
+4. `get_surveillance_and_circuit_notices(limit)`: Check BSE/NSE surveillance notices (ASM, GSM, price bands, graded surveillance).
+5. `get_government_and_regulatory_policies(regulator, limit)`: Track regulatory updates from SEBI, RBI, IRDAI, and Government policy press releases.
+6. `get_world_and_macro_news(limit)`: Retrieve global macroeconomic themes, crude oil trends, and foreign policy news.
+7. `get_google_news(query, topic, limit)`: **Free Google News RSS**: Query breaking headlines by stock ticker, company name, or topic without rate limits or API keys.
+8. `browse_web_page(url, max_chars)`: **Free Web Page Reader**: Extract clean markdown text of any article or report via Jina Reader.
+9. `search_web_free(query, limit)`: **Free Web Search**: Search the live web for breaking announcements, analyst articles, and website info without an API key.
+10. `get_live_market_quote(ticker, exchange, range_period)`: **Free Live Stock Quotes & Metrics**: Real-time prices, day changes, 52-week high/low, day high/low, and volume for NSE/BSE stocks.
+11. `trigger_live_scrape()`: Trigger an on-demand real-time scrape cycle across all feeds.
+
+---
+
+### Connecting Claude Web (`claude.ai`)
+
+When running in cloud hosting (e.g., **Oracle Cloud** at `clawtrade.duckdns.org`), Claude Web connects directly over the internet from Anthropic's cloud backend to your hosted MCP SSE endpoint.
+
+#### 1. Requirements for Claude Web & Oracle Cloud:
+* **HTTPS Requirement**: Anthropic's servers require an SSL/TLS certificate. Use Nginx with Let's Encrypt / Certbot on port 443, or route through a Cloudflare Tunnel:
+  ```
+  https://clawtrade.duckdns.org/mcp/sse
+  ```
+* **Oracle Cloud Ingress**: Ensure your Oracle Cloud VCN Security List and OS firewall (`iptables` / `ufw`) permit inbound traffic on your external port (e.g., 443 / 8000).
+
+#### 2. Adding to Claude Web:
+1. Log in to [claude.ai](https://claude.ai).
+2. Go to **Settings** > **Connectors** (or **Integrations**).
+3. Click **Add custom connector** and enter your public HTTPS endpoint:
+   `https://clawtrade.duckdns.org/mcp/sse`
+
+---
+
+### Connecting Claude Desktop
+
+#### Option A: Remote SSE Connection (Hosted Server)
+To connect your local Claude Desktop app to your hosted remote instance, add this to `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "indian-stock-market-news": {
+      "url": "http://clawtrade.duckdns.org:8000/mcp/sse"
+    }
+  }
+}
+```
+
+#### Option B: Local `stdio` Transport (Running on Local Machine)
+If running locally on your development machine, configure Claude Desktop to launch the server as a subprocess:
+```json
+{
+  "mcpServers": {
+    "indian-stock-market-news": {
+      "command": "python",
+      "args": ["-m", "core.mcp_server"],
+      "cwd": "C:\\path\\to\\news_scraper"
+    }
+  }
+}
+```
+
+#### Option C: Standalone CLI Runner
+You can also run the MCP server standalone in either `stdio` or `sse` mode:
+```powershell
+# Run in default stdio transport:
+python -m core.mcp_server
+
+# Run in SSE transport on custom port:
+python -m core.mcp_server --transport sse --host 0.0.0.0 --port 8001
+```
+
+---
+
 ## Running Tests & CI/CD Verification
 
 ### 1. Run Complete Test Suite
-Execute all 38 unit and integration tests with pytest:
+Execute all 40 unit and integration tests with pytest:
 ```powershell
 pytest
 ```
@@ -274,10 +357,54 @@ To ensure code is only merged into `main` when all tests pass:
 
 ---
 
-## Production Deployment (Docker + PostgreSQL)
+## Production Deployment (All-in-One Docker Image)
 
-To launch the PostgreSQL container on your server or Oracle VM:
+The project includes an **all-in-one, fully self-contained Docker image** containing Python 3.11, all required packages, the embedded database (PostgreSQL 17 / SQLite), background scrapers, and the FastAPI REST API server + Web Dashboard.
+
+### 1. Build the Docker Image
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+docker build -f docker/Dockerfile -t news_scraper:latest .
 ```
-Update `DATABASE_URL` in `.env` to point to the PostgreSQL instance.
+
+### 2. Run with Docker CLI
+
+**Option A: Running with Embedded PostgreSQL (Default)**
+```bash
+docker run -d \
+  --name news_scraper_app \
+  -p 8000:8000 \
+  -p 5432:5432 \
+  -v news_scraper_pg:/var/lib/postgresql/data \
+  news_scraper:latest
+```
+
+**Option B: Running with Lightweight SQLite**
+```bash
+docker run -d \
+  --name news_scraper_app \
+  -p 8000:8000 \
+  -e DATABASE_TYPE=sqlite \
+  -v news_scraper_data:/app/data \
+  news_scraper:latest
+```
+
+### 3. Run with Docker Compose
+```bash
+# Start all-in-one service with persistence from project root:
+docker compose -f docker/docker-compose.yml up -d
+
+# View real-time logs
+docker compose -f docker/docker-compose.yml logs -f
+
+# Stop container
+docker compose -f docker/docker-compose.yml down
+```
+
+### 4. Verify Service Health
+Check the container health and API availability:
+```bash
+curl http://localhost:8000/health
+```
+Access the interactive Web UI and Swagger Docs:
+- **Web Dashboard**: `http://localhost:8000/`
+- **Swagger Documentation**: `http://localhost:8000/docs`

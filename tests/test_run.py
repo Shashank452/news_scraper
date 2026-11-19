@@ -53,3 +53,4 @@ def test_print_banner(capsys):
         assert "INDIAN EQUITIES NEWS SCRAPER & AGGREGATOR SERVICE" in captured.out
         assert "/news/incremental" in captured.out
         assert "/news/checkpoint" in captured.out
+        assert "/mcp/sse" in captured.out

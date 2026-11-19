@@ -3,6 +3,7 @@ Integration tests for FastAPI endpoints.
 """
 
 from datetime import datetime, timezone
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -185,3 +186,59 @@ def test_incremental_cursor_and_checkpoint():
     assert resume_resp.status_code == 200
     resume_data = resume_resp.json()
     assert resume_data["count"] == 0
+
+
+def test_mcp_sse_endpoint():
+    """Verify that the FastMCP SSE endpoint connects and sends the initialization event."""
+    with client.stream("GET", "/mcp/sse") as response:
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers.get("content-type", "")
+        it = response.iter_lines()
+        first_line = next(it)
+        assert "event: endpoint" in first_line
+
+
+def test_google_and_web_endpoints():
+    headers = {"X-API-Key": settings.api_key}
+
+    # 1. Google News endpoint
+    with patch("api.news_api.fetch_google_news") as mock_gn:
+        mock_gn.return_value = [{"title": "Test Headline", "source": "Google News", "link": "https://example.com"}]
+        resp = client.get("/news/google?query=RELIANCE", headers=headers)
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) == 1
+        assert items[0]["title"] == "Test Headline"
+
+    # 2. Browse web endpoint
+    with patch("api.news_api.browse_web_page") as mock_browse:
+        mock_browse.return_value = {"url": "https://example.com", "status": "success", "content": "Article"}
+        resp = client.get("/news/browse?url=https://example.com", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+
+    # 3. Search web endpoint
+    with patch("api.news_api.search_web_free") as mock_search:
+        mock_search.return_value = [{"title": "Nifty 50 News", "url": "https://example.com", "snippet": "updates"}]
+        resp = client.get("/news/search-web?q=Nifty", headers=headers)
+        assert resp.status_code == 200
+        results = resp.json()
+        assert len(results) == 1
+        assert results[0]["title"] == "Nifty 50 News"
+
+    # 4. Market quote endpoint
+    with patch("api.news_api.get_live_market_quote") as mock_quote:
+        mock_quote.return_value = {
+            "symbol": "TCS.NS",
+            "price": 3500.0,
+            "change": 50.0,
+            "change_percent": 1.45,
+            "status": "success",
+        }
+        resp = client.get("/market/quote/TCS?exchange=NSE")
+        assert resp.status_code == 200
+        quote = resp.json()
+        assert quote["symbol"] == "TCS.NS"
+        assert quote["price"] == 3500.0
+        assert quote["change"] == 50.0
